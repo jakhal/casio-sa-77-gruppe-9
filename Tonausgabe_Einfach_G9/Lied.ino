@@ -1,0 +1,88 @@
+void lied() {
+  e4(takt/4-resetT);
+  set1(resetT);
+  e4(takt/4);
+  f4(takt/4);
+  g4(takt/4-resetT);
+  set1(resetT);
+  g4(takt/4);
+  f4(takt/4);
+  e4(takt/4);
+  d4(takt/4);
+  c4(takt/4-resetT);
+  set1(resetT);
+  c4(takt/4);
+  d4(takt/4);
+  e4(takt/4-resetT);
+  set1(resetT);
+  e4(takt*3/8);
+  d4(takt/8-resetT);
+  set1(resetT);
+  d4(takt/2);
+  
+  set1(resetT);
+
+  e4(takt/4);
+  set1(resetT);
+  e4(takt/4);
+  f4(takt/4);
+  g4(takt/4);
+  set1(resetT);
+  g4(takt/4);
+  f4(takt/4);
+  e4(takt/4);
+  d4(takt/4);
+  c4(takt/4);
+  set1(resetT);
+  c4(takt/4);
+  d4(takt/4);
+  e4(takt/4);
+  set1(resetT);
+  d4(takt*3/8);
+  c4(takt/8);
+  set1(resetT);
+  c4(takt/2);
+
+  set1(resetT);
+
+  d4(takt/4);
+  set1(resetT);
+  d4(takt/4);
+  e4(takt/4);
+  c4(takt/4);
+  d4(takt/4);
+  e4(takt/8);
+  f4(takt/8);
+  e4(takt/4);
+  c4(takt/4);
+  d4(takt/4);
+  e4(takt/8);
+  f4(takt/8);
+  e4(takt/4);
+  d4(takt/4);
+  c4(takt/4);
+  d4(takt/4);
+  g3(takt/4);
+
+  e4(takt/2);
+  set1(resetT);
+  e4(takt/4);
+  f4(takt/4);
+  g4(takt/4);
+  set1(resetT);
+  g4(takt/4);
+  f4(takt/4);
+  e4(takt/4);
+  d4(takt/4);
+  c4(takt/4);
+  set1(resetT);
+  c4(takt/4);
+  d4(takt/4);
+  e4(takt/4);
+  d4(takt*3/8);
+  c4(takt/8);
+  set1(resetT);
+  c4(takt/2);
+  
+  set1(takt);
+}
