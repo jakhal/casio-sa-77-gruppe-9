@@ -6,12 +6,15 @@ int state = HIGH;      // the current state of the output pin
 int reading;           // the current reading from the input pin <-- PLAY STOP BUTTON KRAM
 int previous = LOW;    // the previous reading from the input pin
 int PlayStopButton = 5; // 
+long interruptinterval = 500000;
+int bpm =0;
+int Patternlenght = 7;
 
 // the follow variables are long's because the time, measured in miliseconds,
 // will quickly become a bigger number than can be stored in an int.
 long time = 0;         // the last time the output pin was toggled
 long debounce = 200;   // the debounce time, increase if the output flickers
-bool kick[8]       ={1,0,1,0,1,0,1,0};
+bool kick[8]       ={1,1,1,1,1,1,1,1};
 bool snare[8]      ={0,0,1,0,0,0,1,0};
 bool hat[8]        ={1,1,1,1,1,1,1,1};
 bool bongoinnen[8] ={0,0,1,0,0,0,0,1};
@@ -51,9 +54,10 @@ void setup() {
   pinMode(dataPin, OUTPUT);  
   pinMode(clockPin, OUTPUT);
 
-  Serial.begin(31250); // Initialisierung Serielle Verbindung MIDI
+  Serial1.begin(31250); // Initialisierung Serielle Verbindung MIDI
+  Serial.begin(9600);
 
-  Timer1.initialize(500000); // Initialisierung Interupt (Startintervall 500000 microsec)
+  Timer1.initialize(interruptinterval); // Initialisierung Interupt (Startintervall 500000 microsec)
   Timer1.attachInterrupt( timerIsr ); // Serviceroutine: "timerIsr"
   
   pinMode(PlayStopButton, INPUT);
@@ -63,13 +67,30 @@ void loop() {
   checkMatrix();
   checkButtons();
   checkTempo();
+  checkPatternlenght();
+}
+void checkPatternlenght(){
+  Patternlenght = map (analogRead(A7),0,1023,0,8);
+  if (Patternlenght != 7){
+  for (int x = 0; x<8; x++)
+      {
+        lc.setLed(0,6,x,false);
+      }
+  }
+  lc.setLed(0,6,Patternlenght,true);
 }
 void checkTempo() {
+  bpm = 60000000/interruptinterval;
+  Serial.print("BPM: ");
+  Serial.println(bpm);
+  Serial.print("Patternlänge: ");
+  Serial.println(Patternlenght+1);
   if (digitalRead(6))
   {
   //Timer1.detachInterrupt();
   //Timer1.attachInterrupt( timerIsr,map(analogRead(A6),0,1023,100000,10000000)); // attach the service routine here  
-  Timer1.setPeriod(map(analogRead(A6),0,1023,50000,900000));
+  interruptinterval = map(analogRead(A6),0,1023,50000,900000);
+  Timer1.setPeriod(interruptinterval);
   while(!digitalRead(6)){}
   }
 }
@@ -107,14 +128,22 @@ void timerIsr() {
       {
         lc.setLed(0,7,x,false);
       }
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B00000010); // 7seg ="-"
+      digitalWrite(latchPin, HIGH);
       break;
     case 0:           // SCHRITT 1 
       Taktzaehler++;
+      for (int x = 0; x<8; x++)
+      {
+        lc.setLed(0,7,x,false);
+      }
       lc.setLed(0,7,0,true);
       lc.setLed(0,7,7,false);
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B01100000); // 7seg ="1"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;    
     case 1:           // SCHRITT 2 
       Taktzaehler++;
@@ -123,6 +152,7 @@ void timerIsr() {
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B11011010); // 7seg ="2"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;
     case 2:           // SCHRITT 3
       Taktzaehler++;
@@ -131,6 +161,7 @@ void timerIsr() {
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B11110010); // 7seg ="3"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;
     case 3:           // SCHRITT 4
       Taktzaehler++;
@@ -139,6 +170,7 @@ void timerIsr() {
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B01100110); // 7seg ="4"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;
     case 4:           // SCHRITT 5
       Taktzaehler++;
@@ -147,6 +179,7 @@ void timerIsr() {
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B10110110); // 7seg ="5"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;
     case 5:           // SCHRITT 6
       Taktzaehler++;
@@ -155,6 +188,7 @@ void timerIsr() {
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B10111110); // 7seg ="6"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;
     case 6:           // SCHRITT 7
       Taktzaehler++;
@@ -163,6 +197,7 @@ void timerIsr() {
       digitalWrite(latchPin, LOW);
       shiftOut(dataPin, clockPin, LSBFIRST, B11100000); // 7seg ="7"
       digitalWrite(latchPin, HIGH);
+      if (Taktzaehler-1 == Patternlenght) {Taktzaehler = 0;}
       break;
     case 7:           // SCHRITT 8
       Taktzaehler = 0;
@@ -248,9 +283,9 @@ void checkMatrix()
 }
 
 void noteOn(int cmd, int pitch, int velocity) {
-  Serial.write(cmd);
-  Serial.write(pitch);
-  Serial.write(velocity);
+  Serial1.write(cmd);
+  Serial1.write(pitch);
+  Serial1.write(velocity);
 }
 /*int potiWert = 0;
 int zaehler = 0;
