@@ -1,0 +1,273 @@
+#include "LedControl.h"
+#include "TimerOne.h"
+
+
+int state = HIGH;      // the current state of the output pin
+int reading;           // the current reading from the input pin <-- PLAY STOP BUTTON KRAM
+int previous = LOW;    // the previous reading from the input pin
+int PlayStopButton = 5; // 
+
+// the follow variables are long's because the time, measured in miliseconds,
+// will quickly become a bigger number than can be stored in an int.
+long time = 0;         // the last time the output pin was toggled
+long debounce = 200;   // the debounce time, increase if the output flickers
+bool kick[8]       ={1,0,1,0,1,0,1,0};
+bool snare[8]      ={0,0,1,0,0,0,1,0};
+bool hat[8]        ={1,1,1,1,1,1,1,1};
+bool bongoinnen[8] ={0,0,1,0,0,0,0,1};
+bool bongoaussen[8]={0,0,0,1,0,0,1,0};
+bool extra1[8]     ={0,0,0,0,0,0,0,0};
+bool extra2[8]     ={0,0,0,0,0,0,0,0};
+bool extra3[8]     ={0,0,0,0,0,0,0,0};
+ 
+int Taktzaehler = 0;
+/*const int buttonpin1 = 2;
+const int buttonpin2 = 3;
+const int buttonpin3 = 4;
+const int buttonpin4 = 5;
+const int buttonpin5 = 2;
+const int buttonpin6 = 3;
+const int buttonpin7 = 4;
+const int buttonpin8 = 5;
+*/
+LedControl lc=LedControl(12,11,10,1);
+
+//Pin connected to latch pin (ST_CP) of 74HC595
+const int latchPin = 8;
+//Pin connected to clock pin (SH_CP) of 74HC595
+const int clockPin = 9;
+////Pin connected to Data in (DS) of 74HC595
+const int dataPin = 7;
+
+void setup() {
+  DDRC = B00000000; // PORTC = EINGANG
+  DDRA = B11111111; // PORTA = AUSGANG
+  
+  lc.shutdown(0,false); // Initialisierung LED Matrix
+  lc.setIntensity(0,8);
+  lc.clearDisplay(0);
+
+  pinMode(latchPin, OUTPUT); // PINS 74HC595 Schieberegister 7Seg-Anzeige
+  pinMode(dataPin, OUTPUT);  
+  pinMode(clockPin, OUTPUT);
+
+  Serial.begin(31250); // Initialisierung Serielle Verbindung MIDI
+
+  Timer1.initialize(500000); // Initialisierung Interupt (Startintervall 500000 microsec)
+  Timer1.attachInterrupt( timerIsr ); // Serviceroutine: "timerIsr"
+  
+  pinMode(PlayStopButton, INPUT);
+}
+
+void loop() {
+  checkMatrix();
+  checkButtons();
+  checkTempo();
+}
+void checkTempo() {
+  if (digitalRead(6))
+  {
+  //Timer1.detachInterrupt();
+  //Timer1.attachInterrupt( timerIsr,map(analogRead(A6),0,1023,100000,10000000)); // attach the service routine here  
+  Timer1.setPeriod(map(analogRead(A6),0,1023,50000,900000));
+  while(!digitalRead(6)){}
+  }
+}
+void timerIsr() {
+  if (Taktzaehler != -1){
+  if (kick[Taktzaehler] == true)
+    {
+    noteOn(0x90,0x3C,0x7F);
+    noteOn(0x90,0x3C,0x00);  
+    }
+  if (snare[Taktzaehler] == true)
+    {
+    noteOn(0x90,0x3E,0x7F);
+    noteOn(0x90,0x3E,0x00);  
+    }
+  if (hat[Taktzaehler] == true)
+    {
+    noteOn(0x90,0x3F,0x7F);
+    noteOn(0x90,0x3F,0x00);  
+    }
+  if (bongoinnen[Taktzaehler] == true)
+    {
+    noteOn(0x90,0x40,0x7F);
+    noteOn(0x90,0x40,0x00);  
+    }
+  if (bongoaussen[Taktzaehler] == true)
+    {
+    noteOn(0x90,0x41,0x7F);
+    noteOn(0x90,0x41,0x00);  
+    } 
+  }
+ switch (Taktzaehler) {
+    case -1: // STOP --- um Interrupt wieder zu starten, bei START-Druck Taktzaehler auf 0 setzen und Timer1.attachen
+      for (int x = 0; x<8; x++)
+      {
+        lc.setLed(0,7,x,false);
+      }
+      break;
+    case 0:           // SCHRITT 1 
+      Taktzaehler++;
+      lc.setLed(0,7,0,true);
+      lc.setLed(0,7,7,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B01100000); // 7seg ="1"
+      digitalWrite(latchPin, HIGH);
+      break;    
+    case 1:           // SCHRITT 2 
+      Taktzaehler++;
+      lc.setLed(0,7,1,true);
+      lc.setLed(0,7,0,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B11011010); // 7seg ="2"
+      digitalWrite(latchPin, HIGH);
+      break;
+    case 2:           // SCHRITT 3
+      Taktzaehler++;
+      lc.setLed(0,7,2,true);
+      lc.setLed(0,7,1,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B11110010); // 7seg ="3"
+      digitalWrite(latchPin, HIGH);
+      break;
+    case 3:           // SCHRITT 4
+      Taktzaehler++;
+      lc.setLed(0,7,3,true);
+      lc.setLed(0,7,2,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B01100110); // 7seg ="4"
+      digitalWrite(latchPin, HIGH);
+      break;
+    case 4:           // SCHRITT 5
+      Taktzaehler++;
+      lc.setLed(0,7,4,true);
+      lc.setLed(0,7,3,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B10110110); // 7seg ="5"
+      digitalWrite(latchPin, HIGH);
+      break;
+    case 5:           // SCHRITT 6
+      Taktzaehler++;
+      lc.setLed(0,7,5,true);
+      lc.setLed(0,7,4,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B10111110); // 7seg ="6"
+      digitalWrite(latchPin, HIGH);
+      break;
+    case 6:           // SCHRITT 7
+      Taktzaehler++;
+      lc.setLed(0,7,6,true);
+      lc.setLed(0,7,5,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B11100000); // 7seg ="7"
+      digitalWrite(latchPin, HIGH);
+      break;
+    case 7:           // SCHRITT 8
+      Taktzaehler = 0;
+      lc.setLed(0,7,7,true);
+      lc.setLed(0,7,6,false);
+      digitalWrite(latchPin, LOW);
+      shiftOut(dataPin, clockPin, LSBFIRST, B11111110); // 7seg ="8"
+      digitalWrite(latchPin, HIGH);
+      break;
+  }
+}
+void checkButtons()
+{
+reading = digitalRead(PlayStopButton);
+// compare the buttonState to its previous state
+  if (reading == HIGH && previous == LOW && millis() - time > debounce) {
+    if (state == HIGH){
+      state = LOW;
+      Taktzaehler = -1;
+    }
+    else{
+      state = HIGH;
+      if (Taktzaehler == -1)
+      {
+        Taktzaehler = 0;
+       }
+      else {
+        Taktzaehler=Taktzaehler;
+        }
+    }
+    time = millis();    
+  }
+
+
+  previous = reading;
+}
+void checkMatrix() 
+{
+ int i;
+ for (i = 0; i < 8; i = i + 1) 
+  {
+   if (kick[i] == true)
+    { 
+    lc.setLed(0,0,i,true);
+    }
+   else
+    {
+    lc.setLed(0,0,i,false);
+    }
+   if (snare[i] == true)
+    { 
+    lc.setLed(0,1,i,true);
+    }
+   else
+    {
+    lc.setLed(0,1,i,false);
+    }
+   if (hat[i] == true)
+    { 
+    lc.setLed(0,2,i,true);
+    }
+   else
+    {
+    lc.setLed(0,2,i,false);
+    }
+   if (bongoinnen[i] == true)
+    { 
+    lc.setLed(0,3,i,true);
+    }
+   else
+    {
+    lc.setLed(0,3,i,false);
+    }
+    if (bongoaussen[i] == true)
+    { 
+    lc.setLed(0,4,i,true);
+    }
+   else
+    {
+    lc.setLed(0,4,i,false);
+    }
+  }
+}
+
+void noteOn(int cmd, int pitch, int velocity) {
+  Serial.write(cmd);
+  Serial.write(pitch);
+  Serial.write(velocity);
+}
+/*int potiWert = 0;
+int zaehler = 0;
+
+int bit1 = 0;
+int bit2 = 0;
+int bit3 = 0;
+
+  for ( zaehler = 0 ; zaehler <= 7; zaehler++ ) {
+
+  bit1 = bitRead(zaehler, 0);
+  bit2 = bitRead(zaehler, 1);
+  bit3 = bitRead(zaehler, 2);
+
+  digitalWrite(2, bit1);
+  digitalWrite(3, bit2);
+  digitalWrite(4, bit3);
+
+  potiWert = analogRead(A0);
+  */
