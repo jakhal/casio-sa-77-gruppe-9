@@ -14,25 +14,30 @@ int Patternlenght = 7;
 // will quickly become a bigger number than can be stored in an int.
 long time = 0;         // the last time the output pin was toggled
 long debounce = 200;   // the debounce time, increase if the output flickers
-bool kick[8]       ={1,1,1,1,1,1,1,1};
+bool kick[8]       ={1,0,1,0,1,0,1,0};
 bool snare[8]      ={0,0,1,0,0,0,1,0};
 bool hat[8]        ={1,1,1,1,1,1,1,1};
-bool bongoinnen[8] ={0,0,1,0,0,0,0,1};
-bool bongoaussen[8]={0,0,0,1,0,0,1,0};
+bool bongoinnen[8] ={0,0,0,1,0,0,0,1};
+bool bongoaussen[8]={0,1,0,1,0,1,0,1};
 bool extra1[8]     ={0,0,0,0,0,0,0,0};
 bool extra2[8]     ={0,0,0,0,0,0,0,0};
 bool extra3[8]     ={0,0,0,0,0,0,0,0};
+int buttonpins[8]  ={44,45,46,47,48,49,50,51};
  
 int Taktzaehler = 0;
-/*const int buttonpin1 = 2;
-const int buttonpin2 = 3;
-const int buttonpin3 = 4;
-const int buttonpin4 = 5;
-const int buttonpin5 = 2;
-const int buttonpin6 = 3;
-const int buttonpin7 = 4;
-const int buttonpin8 = 5;
-*/
+const int buttonpin1 = 40;
+const int buttonpin2 = 41;
+const int buttonpin3 = 42;
+const int buttonpin4 = 43;
+const int buttonpin5 = 44;
+const int buttonpin6 = 45;
+const int buttonpin7 = 46;
+const int buttonpin8 = 47;
+const int buttonpin9 = 48;
+const int buttonpin10 = 49;
+const int buttonpin11 = 50;
+const int buttonpin12 = 51;
+
 LedControl lc=LedControl(12,11,10,1);
 
 //Pin connected to latch pin (ST_CP) of 74HC595
@@ -233,6 +238,10 @@ reading = digitalRead(PlayStopButton);
 
 
   previous = reading;
+
+  for (int index = 0, index < 8, index ++){
+    if (digitalRead(
+  }
 }
 void checkMatrix() 
 {
