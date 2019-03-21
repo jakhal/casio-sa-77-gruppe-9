@@ -8,7 +8,7 @@ int reading;           // the current reading from the input pin <-- PLAY STOP B
 int previous = LOW;    // the previous reading from the input pin
 int PlayStopButton = 5; // 
 long interruptinterval = 500000;
-int bpm =0;
+float bpm =0;
 int Patternlenght = 7;
 
 // the follow variables are long's because the time, measured in miliseconds,
@@ -25,7 +25,7 @@ bool bongoaussen[8]={0,0,0,0,0,0,0,0};
 bool extra1[8]     ={0,0,0,0,0,0,0,0};
 bool extra2[8]     ={0,0,0,0,0,0,0,0};
 bool extra3[8]     ={0,0,0,0,0,0,0,0};
-int buttonpinshori[8]  ={38,41,42,43,44,45,46,47};
+int buttonpinshori[8]  ={A8,A9,A10,A11,A12,A13,A14,A15};
 int buttonpinsvert[5]  ={48,49,50,51,52};
 int lastbuttonstatehori[8]={0,0,0,0,0,0,0,0};
 int lastbuttonstatevert[5]={0,0,0,0,0};
@@ -59,6 +59,8 @@ const int dataPin = 7;
 
 const int numReadings = 10; // POTI PATTERNLÄNGE SMOOTHING
 
+int input = 0;
+
 int readings[numReadings];      // the readings from the analog input
 int readIndex = 0;              // the index of the current reading
 int total = 0;                  // the running total
@@ -87,7 +89,7 @@ void setup() {
   Timer1.attachInterrupt( timerIsr ); // Serviceroutine: "timerIsr"
   
   pinMode(PlayStopButton, INPUT);
-  pinMode(38, INPUT);
+  /*pinMode(38, INPUT);
   pinMode(41, INPUT);
   pinMode(42, INPUT);
   pinMode(43, INPUT);
@@ -95,6 +97,7 @@ void setup() {
   pinMode(45, INPUT);
   pinMode(46, INPUT);
   pinMode(47, INPUT);
+  */
   pinMode(48, INPUT);
   pinMode(49, INPUT);
   pinMode(50, INPUT);
@@ -106,6 +109,14 @@ void setup() {
   pinMode(A3, OUTPUT);
   pinMode(A4, OUTPUT);
   pinMode(A5, OUTPUT);
+  pinMode(A8, OUTPUT);
+  pinMode(A9, OUTPUT);
+  pinMode(A10, OUTPUT);
+  pinMode(A11, OUTPUT);
+  pinMode(A12, OUTPUT);
+  pinMode(A13, OUTPUT);
+  pinMode(A14, OUTPUT);
+  pinMode(A15, OUTPUT);
  
     // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -122,6 +133,8 @@ void loop() {
   checkTempo();
   checkPatternlenght();
   displayprog();
+  //PORTC = input;
+  PORTA = B11111111;
 }
 void displayprog(){
   // set the cursor to column 0, line 1
@@ -133,6 +146,7 @@ void displayprog(){
   // print the number of seconds since reset:
   lcd.print("BPM: ");
   lcd.print(bpm);
+  lcd.setCursor(8, 1);
   lcd.print(" Step: ");
   lcd.print(Taktzaehler);
   
@@ -141,7 +155,7 @@ void checkPatternlenght(){
    // subtract the last reading:
   total = total - readings[readIndex];
   // read from the sensor:
-  readings[readIndex] = map (analogRead(A9),0,1023,0,8); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
+  readings[readIndex] = map (analogRead(A7),0,1023,0,8); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
   // add the reading to the total:
   total = total + readings[readIndex];
   // advance to the next position in the array:
@@ -155,7 +169,7 @@ void checkPatternlenght(){
 
   // calculate the average:
 Patternlenght = total / numReadings;
-  //Patternlenght = map (analogRead(A9),0,1023,0,8); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
+  //Patternlenght = map (analogRead(A7),0,1023,0,8); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
   if (Patternlenght != 8){
   for (int x = 0; x<8; x++)
       {
@@ -175,7 +189,7 @@ void checkTempo() {
   {
   //Timer1.detachInterrupt();
   //Timer1.attachInterrupt( timerIsr,map(analogRead(A6),0,1023,100000,10000000)); // attach the service routine here  
-  interruptinterval = map(analogRead(A8),0,1023,50000,900000);
+  interruptinterval = map(analogRead(A7),0,1023,50000,900000);
   Timer1.setPeriod(interruptinterval);
   while(!digitalRead(6)){}
   }
@@ -185,27 +199,55 @@ void timerIsr() {
   if (kick[Taktzaehler] == true)
     {
     noteOn(0x90,0x3C,0x7F);
-    noteOn(0x90,0x3C,0x00);  
+    noteOn(0x90,0x3C,0x00);
+    noteOn(0x90,0x1E,0x7F);
+    noteOn(0x90,0x1E,0x00);
+    do{
+      PORTA =B11111111;
+    }
+    while(digitalRead(36)==HIGH);
+    PORTA = B11111011;  
     }
   if (snare[Taktzaehler] == true)
     {
     noteOn(0x90,0x3E,0x7F);
-    noteOn(0x90,0x3E,0x00);  
+    noteOn(0x90,0x3E,0x00);
+    do{
+    PORTA =B11111111;
+    }
+    while(digitalRead(36)==HIGH);
+    PORTA = B11110111; 
     }
   if (hat[Taktzaehler] == true)
     {
     noteOn(0x90,0x3F,0x7F);
-    noteOn(0x90,0x3F,0x00);  
+    noteOn(0x90,0x3F,0x00);
+    do{
+    PORTA =B11111111;
+    }
+    while(digitalRead(36)==HIGH);
+    PORTA = B11011111;   
     }
   if (bongoinnen[Taktzaehler] == true)
     {
     noteOn(0x90,0x40,0x7F);
-    noteOn(0x90,0x40,0x00);  
+    noteOn(0x90,0x40,0x00); 
+     do{
+    PORTA =B11111111;
     }
+    while(digitalRead(36)==HIGH);
+    PORTA = B11101111;   
+    } 
+    
   if (bongoaussen[Taktzaehler] == true)
     {
     noteOn(0x90,0x41,0x7F);
-    noteOn(0x90,0x41,0x00);  
+    noteOn(0x90,0x41,0x00); 
+    do{
+    PORTA =B11111111;
+    }
+    while(digitalRead(36)==HIGH);
+    PORTA = B01111111; 
     } 
   }
  switch (Taktzaehler) {
