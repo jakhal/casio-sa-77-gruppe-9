@@ -1,6 +1,9 @@
+#include <LCDMenuLib2.h>
 #include "LedControl.h"
 #include "TimerOne.h"
 #include <LiquidCrystal.h>
+#include <string.h>
+
 
 
 int state = HIGH;      // the current state of the output pin
@@ -10,6 +13,7 @@ int PlayStopButton = 5; //
 long interruptinterval = 500000;
 float bpm =0;
 int Patternlenght = 7;
+int testdelay = 40;
 
 // the follow variables are long's because the time, measured in miliseconds,
 // will quickly become a bigger number than can be stored in an int.
@@ -17,14 +21,43 @@ long time = 0;
 long time2 = 0; // the last time the output pin was toggled
 long debounce2 = 200;
 long debounce = 200;   // the debounce time, increase if the output flickers
-bool kick[8]       ={1,0,1,0,1,0,1,0};
-bool snare[8]      ={0,0,1,0,0,0,1,0};
-bool hat[8]        ={1,1,1,1,1,1,1,1};
-bool bongoinnen[8] ={0,0,0,1,0,0,0,1};
-bool bongoaussen[8]={0,0,0,0,0,0,0,0};
+bool currentpattern[5][8]  = {    
+  {1,1,1,1,1,1,1,1},  //KICK = 0
+  {1,0,0,0,0,0,0,0},  //SNARE = 1
+  {1,0,0,0,0,0,0,0},  //HIGHHAT = 2
+  {1,0,0,0,0,0,0,0},  //BONGO INNEN = 3
+  {1,0,1,1,1,1,1,1},  //BONGO AUßEN = 4
+};
+/*bool kick[8]       ={1,0,1,0,1,0,1,0};  //KICK
+bool snare[8]      ={0,0,1,0,0,0,1,0};  //SNARE
+bool hat[8]        ={1,1,1,1,1,1,1,1};  //HIGHHAT
+bool bongoinnen[3][8] ={0,0,0,1,0,0,0,1};  //BONGO INNEN
+bool bongoaussen[4][8]={0,0,0,0,0,0,0,0};  //BONGO AUßEN
 bool extra1[8]     ={0,0,0,0,0,0,0,0};
 bool extra2[8]     ={0,0,0,0,0,0,0,0};
 bool extra3[8]     ={0,0,0,0,0,0,0,0};
+*/
+bool save1[5][8]   = {
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+};
+bool save2[5][8]   = {
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+};
+bool save3[5][8]   = {
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0},
+};
 int buttonpinshori[8]  ={A8,A9,A10,A11,A12,A13,A14,A15};
 int buttonpinsvert[5]  ={48,49,50,51,52};
 int lastbuttonstatehori[8]={0,0,0,0,0,0,0,0};
@@ -66,6 +99,9 @@ int readIndex = 0;              // the index of the current reading
 int total = 0;                  // the running total
 int average = 0;                // the average
 
+int savepin = 3;
+int recallpin = 4;
+
 void setup() {
   DDRC = B00000000; // PORTC = EINGANG
   DDRA = B11111111; // PORTA = AUSGANG
@@ -87,6 +123,8 @@ void setup() {
 
   Timer1.initialize(interruptinterval); // Initialisierung Interupt (Startintervall 500000 microsec)
   Timer1.attachInterrupt( timerIsr ); // Serviceroutine: "timerIsr"
+
+  attachInterrupt(digitalPinToInterrupt(2), chipansteuerung, LOW);
   
   pinMode(PlayStopButton, INPUT);
   /*pinMode(38, INPUT);
@@ -117,6 +155,8 @@ void setup() {
   pinMode(A13, OUTPUT);
   pinMode(A14, OUTPUT);
   pinMode(A15, OUTPUT);
+  pinMode(3, INPUT);
+  pinMode(4, INPUT);
  
     // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -133,8 +173,68 @@ void loop() {
   checkTempo();
   checkPatternlenght();
   displayprog();
+  savepattern();
+  recallpattern();
   //PORTC = input;
+  //PORTA = B11111111;
+  
+  // KICK:  B11111011; ALLE:          B01000011;
+  // SNARE: B11110111; KICK & SNARE:  B11110011; SNARE & HH:      B11010111; HH & BONGIN: B11001111; BONGIN & BONGOU: B01101111;
+  // HIHAT: B11011111; KICK & HH:     B11011011; SNARE & BONGIN:  B11100111; HH & BONGOU: B01011111;
+  //BONGIN: B11101111; KICK & BONGIN: B11101011; SNARE & BONGOU:  B01110111; 
+  //BONGOU: B01111111; KICK & BONGOU: B01111011;
+}
+
+void chipansteuerung(){
+
+  if (Taktzaehler != -1){
+  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false) 
+    { // NUR KICK
+    PORTA = B11111011;
+    }
+  if (currentpattern[1][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+    { // NUR SNARE
+    PORTA = B11110111; 
+    }
+  if (currentpattern[2][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+    { // NUR HIHAT
+    PORTA = B11011111;
+    }
+  if (currentpattern[3][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+    { // NUR BONGOINNEN
+    PORTA = B11101111; 
+    } 
+  if (currentpattern[4][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false)
+    { // NUR BONGOAUßEN
+    PORTA = B01111111; 
+    }
+  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
+    { // ALLE
+    PORTA = B01000011; 
+    }
+   if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+    { // KICK & SNARE
+    PORTA = B11110011; 
+    }
+  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+    { // KICK & HIHAT
+    PORTA = B11011011; 
+    }
+  }
+  delayMicroseconds(testdelay);
   PORTA = B11111111;
+}
+void savepattern(){
+  if(digitalRead(savepin)==HIGH){
+    memcpy(save1, currentpattern, sizeof(save1));
+  }
+  else{};
+}
+void recallpattern(){
+  if(digitalRead(recallpin)==HIGH){
+    memcpy(currentpattern, save1, sizeof(currentpattern));
+  }
+  else{};
 }
 void displayprog(){
   // set the cursor to column 0, line 1
@@ -195,61 +295,85 @@ void checkTempo() {
   }
 }
 void timerIsr() {
-  if (Taktzaehler != -1){
-  if (kick[Taktzaehler] == true)
+  /*if (Taktzaehler != -1){
+  if (currentpattern[0][Taktzaehler] == true)
     {
-    noteOn(0x90,0x3C,0x7F);
-    noteOn(0x90,0x3C,0x00);
-    noteOn(0x90,0x1E,0x7F);
-    noteOn(0x90,0x1E,0x00);
     do{
       PORTA =B11111111;
     }
     while(digitalRead(36)==HIGH);
-    PORTA = B11111011;  
+    PORTA = B11111011;
+    delayMicroseconds(testdelay);
+    //PORTA = B11111111;
+    /*noteOn(0x90,0x3C,0x7F);
+    noteOn(0x90,0x3C,0x00);
+    noteOn(0x90,0x1E,0x7F);
+    noteOn(0x90,0x1E,0x00);
+    
     }
-  if (snare[Taktzaehler] == true)
+  //else{PORTA = B11111111;}
+  if (currentpattern[1][Taktzaehler] == true)
     {
-    noteOn(0x90,0x3E,0x7F);
+    /*noteOn(0x90,0x3E,0x7F);
     noteOn(0x90,0x3E,0x00);
+    
+    switch (PORTC)
+    
     do{
     PORTA =B11111111;
     }
     while(digitalRead(36)==HIGH);
     PORTA = B11110111; 
+    delayMicroseconds(testdelay);
+    PORTA = B11111111;
     }
-  if (hat[Taktzaehler] == true)
+  //else{PORTA = B11111111;}
+  if (currentpattern[2][Taktzaehler] == true)
     {
-    noteOn(0x90,0x3F,0x7F);
-    noteOn(0x90,0x3F,0x00);
     do{
     PORTA =B11111111;
     }
     while(digitalRead(36)==HIGH);
-    PORTA = B11011111;   
+    PORTA = B11011111;
+    delayMicroseconds(testdelay);
+    PORTA = B11111111;  
+ 
+    noteOn(0x90,0x3F,0x7F);
+    noteOn(0x90,0x3F,0x00); 
+
     }
-  if (bongoinnen[Taktzaehler] == true)
+  //else{PORTA = B11111111;}
+  if (currentpattern[3][Taktzaehler] == true)
     {
+      
     noteOn(0x90,0x40,0x7F);
     noteOn(0x90,0x40,0x00); 
+    
      do{
     PORTA =B11111111;
     }
     while(digitalRead(36)==HIGH);
-    PORTA = B11101111;   
+    PORTA = B11101111; 
+    delayMicroseconds(testdelay);
+    PORTA = B11111111;  
     } 
-    
-  if (bongoaussen[Taktzaehler] == true)
+  else{PORTA = B11111111;}
+  if (currentpattern[4][Taktzaehler] == true)
     {
     noteOn(0x90,0x41,0x7F);
     noteOn(0x90,0x41,0x00); 
+    
     do{
     PORTA =B11111111;
     }
     while(digitalRead(36)==HIGH);
     PORTA = B01111111; 
+    delayMicroseconds(testdelay);
+    PORTA = B11111111;
     } 
+  else{PORTA = B11111111;}
   }
+ */
  switch (Taktzaehler) {
     case -1: // STOP --- um Interrupt wieder zu starten, bei START-Druck Taktzaehler auf 0 setzen und Timer1.attachen
       for (int x = 0; x<8; x++)
@@ -367,33 +491,33 @@ reading = digitalRead(PlayStopButton);
       if ((digitalRead(buttonpinsvert[vert]) == HIGH && digitalRead(buttonpinshori[hori]) && millis() - time2 > debounce2) == HIGH ){
         
         if (vert == 0){ // KICK
-          if (kick[hori] == 0){
-            kick[hori] = 1;
+          if (currentpattern[0][hori] == 0){
+            currentpattern[0][hori] = 1;
           }
-          else {kick[hori] =0;}
+          else {currentpattern[0][hori] =0;}
           time2 = millis();  
         }
         else{};
         if (vert == 1){ // SNARE
-          if (snare[hori] == 0){
-            snare[hori] = 1;
+          if (currentpattern[1][hori] == 0){
+            currentpattern[1][hori] = 1;
           }
-          else {snare[hori] =0;}
+          else {currentpattern[1][hori] =0;}
           time2 = millis();   
         }
         if (vert == 2){ // HIGHHAT
-          if (hat[hori] == 0){
-            hat[hori] = 1;
+          if (currentpattern[2][hori] == 0){
+            currentpattern[2][hori] = 1;
           }
-          else {hat[hori] =0;}
+          else {currentpattern[2][hori] =0;}
           time2 = millis();   
         }
         else{};
         if (vert == 3){ // BONGOINNEN
-          if (bongoinnen[hori] == 0){
-            bongoinnen[hori] = 1;
+          if (currentpattern[3][hori] == 0){
+            currentpattern[3][hori] = 1;
           }
-          else {bongoinnen[hori] =0;}
+          else {currentpattern[3][hori] =0;}
           time2 = millis();   
         }
         else{};
@@ -412,7 +536,7 @@ void checkMatrix()
  int i;
  for (i = 0; i < 8; i = i + 1) 
   {
-   if (kick[i] == true)
+   if (currentpattern[0][i] == true)
     { 
     lc.setLed(0,0,i,true);
     }
@@ -420,7 +544,7 @@ void checkMatrix()
     {
     lc.setLed(0,0,i,false);
     }
-   if (snare[i] == true)
+   if (currentpattern[1][i] == true)
     { 
     lc.setLed(0,1,i,true);
     }
@@ -428,7 +552,7 @@ void checkMatrix()
     {
     lc.setLed(0,1,i,false);
     }
-   if (hat[i] == true)
+   if (currentpattern[2][i] == true)
     { 
     lc.setLed(0,2,i,true);
     }
@@ -436,7 +560,7 @@ void checkMatrix()
     {
     lc.setLed(0,2,i,false);
     }
-   if (bongoinnen[i] == true)
+   if (currentpattern[3][i] == true)
     { 
     lc.setLed(0,3,i,true);
     }
@@ -444,7 +568,7 @@ void checkMatrix()
     {
     lc.setLed(0,3,i,false);
     }
-    if (bongoaussen[i] == true)
+    if (currentpattern[4][i] == true)
     { 
     lc.setLed(0,4,i,true);
     }
