@@ -1,9 +1,9 @@
+#include <TimerThree.h>
 #include <LCDMenuLib2.h>
 #include "LedControl.h"
 #include "TimerOne.h"
 #include <LiquidCrystal.h>
 #include <string.h>
-
 
 
 int state = HIGH;      // the current state of the output pin
@@ -13,7 +13,7 @@ int PlayStopButton = 5; //
 long interruptinterval = 500000;
 float bpm =0;
 int Patternlenght = 7;
-int testdelay = 40;
+int testdelay = 60;
 
 // the follow variables are long's because the time, measured in miliseconds,
 // will quickly become a bigger number than can be stored in an int.
@@ -22,11 +22,11 @@ long time2 = 0; // the last time the output pin was toggled
 long debounce2 = 200;
 long debounce = 200;   // the debounce time, increase if the output flickers
 bool currentpattern[5][8]  = {    
-  {1,1,1,1,1,1,1,1},  //KICK = 0
-  {1,0,0,0,0,0,0,0},  //SNARE = 1
-  {1,0,0,0,0,0,0,0},  //HIGHHAT = 2
-  {1,0,0,0,0,0,0,0},  //BONGO INNEN = 3
-  {1,0,1,1,1,1,1,1},  //BONGO AUßEN = 4
+  {0,0,0,0,0,0,0,0},  //KICK = 0
+  {0,0,0,0,0,0,0,0},  //SNARE = 1
+  {1,1,1,1,1,1,1,1},  //HIGHHAT = 2
+  {0,0,0,0,0,0,0,0},  //BONGO INNEN = 3
+  {0,0,0,0,0,0,0,0},  //BONGO AUßEN = 4
 };
 /*bool kick[8]       ={1,0,1,0,1,0,1,0};  //KICK
 bool snare[8]      ={0,0,1,0,0,0,1,0};  //SNARE
@@ -94,6 +94,8 @@ const int numReadings = 10; // POTI PATTERNLÄNGE SMOOTHING
 
 int input = 0;
 
+volatile int pullupinterval = 30000;
+
 int readings[numReadings];      // the readings from the analog input
 int readIndex = 0;              // the index of the current reading
 int total = 0;                  // the running total
@@ -101,6 +103,8 @@ int average = 0;                // the average
 
 int savepin = 3;
 int recallpin = 4;
+
+volatile bool flag = 1;
 
 void setup() {
   DDRC = B00000000; // PORTC = EINGANG
@@ -122,9 +126,12 @@ void setup() {
   Serial.begin(9600);
 
   Timer1.initialize(interruptinterval); // Initialisierung Interupt (Startintervall 500000 microsec)
-  Timer1.attachInterrupt( timerIsr ); // Serviceroutine: "timerIsr"
+  Timer1.attachInterrupt(timerIsr); // Serviceroutine: "timerIsr"
 
-  attachInterrupt(digitalPinToInterrupt(2), chipansteuerung, LOW);
+  Timer3.initialize(interruptinterval/2); // Initialisierung Interupt
+  Timer3.attachInterrupt(pulluproutine); // Serviceroutine: "pulluproutine"
+
+  attachInterrupt(digitalPinToInterrupt(2), chipansteuerung, FALLING);
   
   pinMode(PlayStopButton, INPUT);
   /*pinMode(38, INPUT);
@@ -157,6 +164,7 @@ void setup() {
   pinMode(A15, OUTPUT);
   pinMode(3, INPUT);
   pinMode(4, INPUT);
+  pinMode(13, OUTPUT);
  
     // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -175,18 +183,23 @@ void loop() {
   displayprog();
   savepattern();
   recallpattern();
+  Serial.println(flag);
   //PORTC = input;
   //PORTA = B11111111;
   
-  // KICK:  B11111011; ALLE:          B01000011;
-  // SNARE: B11110111; KICK & SNARE:  B11110011; SNARE & HH:      B11010111; HH & BONGIN: B11001111; BONGIN & BONGOU: B01101111;
-  // HIHAT: B11011111; KICK & HH:     B11011011; SNARE & BONGIN:  B11100111; HH & BONGOU: B01011111;
+  // KICK:  B11111011; ALLE:          B01000011;                                                                                 KICK & SNARE & HIHAT:  B11010011  ;  KICK & HIHAT & BONGIN: B11001011; SNARE & HIHAT & BONGIN: B11000111; HIHAT & BONGIN & BONGOU: B01001111;  SNARE & HIHAT & BONGIN & BONGOUT: B01000111;
+  // SNARE: B11110111; KICK & SNARE:  B11110011; SNARE & HH:      B11010111; HH & BONGIN: B11001111; BONGIN & BONGOU: B01101111; KICK & SNARE & BONGIN: B11100011;  KICK & HIHAT & BONGOU: B01011011; SNARE & HIHAT & BONGOU: B01010111; KICK & SNARE & HIHAT & BONGIN: B11000011;
+  // HIHAT: B11011111; KICK & HH:     B11011011; SNARE & BONGIN:  B11100111; HH & BONGOU: B01011111;                             KICK & SNARE & BONGOU: B01110011;  KICK & BONGI & BONGOU: B01101011; SNARE & BONGI & BONGOU: B01100111; KICK & SNARE & HIHAT & BONGOU: B01010011;
   //BONGIN: B11101111; KICK & BONGIN: B11101011; SNARE & BONGOU:  B01110111; 
   //BONGOU: B01111111; KICK & BONGOU: B01111011;
 }
 
+void pulluproutine(){
+  flag = !flag;
+}
 void chipansteuerung(){
-
+  if (flag != 1){
+ digitalWrite(13, HIGH);
   if (Taktzaehler != -1){
   if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false) 
     { // NUR KICK
@@ -220,9 +233,96 @@ void chipansteuerung(){
     { // KICK & HIHAT
     PORTA = B11011011; 
     }
+   if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+  { // KICK & BONGIN
+    PORTA = B11101011;
   }
+  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+  { // KICK & BONGOUT
+    PORTA = B01111011;
+  }
+    if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+  { // SNARE & HIHAT
+    PORTA = B11010111;
+  }
+  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+  { // SNARE & BONGIN
+    PORTA = B11100111;
+  }
+  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+ { // SNARE & BONGOUT
+  PORTA = B01110111;
+ }
+ if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+ { // HIHAT & BONGIN
+  PORTA = B11001111;
+ }
+ if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+  { // HIHAT & BONGOUT
+   PORTA = B01011111;
+  }
+  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
+  { // BONGIN & BONGOUT
+   PORTA = B01101111;
+  }
+  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
+ { // KICK & SNARE & HIHAT
+  PORTA = B11010011;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+ { // KICK & SNARE & BONGIN
+  PORTA = B11100011;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+ { // KICK & SNARE & BONGOU
+  PORTA = B01110011;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+ { // KICK & HIHAT & BONGIN
+  PORTA = B11001011;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+ { // KICK & HIHAT & BONGOU
+  PORTA = B01011011;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
+ { // KICK & BONGIN & BONGOU
+  PORTA = B01101011;
+ }
+ if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+ { // SNARE & HIHAT & BONGIN
+  PORTA = B11000111;
+ }
+ if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+ { // SNARE & HIHAT & BONGOU
+  PORTA = B01010111;
+ }
+ if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
+ { // SNARE & BONGIN & BONGOUT
+  PORTA = B01100111;
+ }
+  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
+ { // HIHAT & BONGIN & BONGOU
+  PORTA = B01001111;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
+ { // KICK & SNARE & HIHAT & BONGIN
+ PORTA = B11000011;
+ }
+ if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
+ { // KICK & SNARE & HIHAT & BONGOUT
+  PORTA = B01010011;
+ }
+ if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
+ { // SNARE & HIHAT & BONGIN & BONGOUT
+  PORTA = B01000111;
+ }
   delayMicroseconds(testdelay);
   PORTA = B11111111;
+  }
+  digitalWrite(13, LOW);
+}
+else {};
 }
 void savepattern(){
   if(digitalRead(savepin)==HIGH){
@@ -289,11 +389,15 @@ void checkTempo() {
   {
   //Timer1.detachInterrupt();
   //Timer1.attachInterrupt( timerIsr,map(analogRead(A6),0,1023,100000,10000000)); // attach the service routine here  
-  interruptinterval = map(analogRead(A7),0,1023,50000,900000);
+  interruptinterval = map(analogRead(A6),0,1023,40000,900000);
   Timer1.setPeriod(interruptinterval);
+  Timer3.setPeriod(interruptinterval/2); 
   while(!digitalRead(6)){}
   }
 }
+
+/* keine midi ansteuerung mehr
+*/
 void timerIsr() {
   /*if (Taktzaehler != -1){
   if (currentpattern[0][Taktzaehler] == true)
@@ -386,6 +490,10 @@ void timerIsr() {
       break;
     case 0:           // SCHRITT 1 
       Taktzaehler++;
+      /*flag = 1;
+      PORTA = B11111111;
+      delayMicroseconds(30000); 
+      flag = 0;*/
       for (int x = 0; x<8; x++)
       {
         lc.setLed(0,7,x,false);
@@ -399,6 +507,10 @@ void timerIsr() {
       break;    
     case 1:           // SCHRITT 2 
       Taktzaehler++;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);       
+      flag = 0;*/
       lc.setLed(0,7,1,true);
       lc.setLed(0,7,0,false);
       digitalWrite(latchPin, LOW);
@@ -408,6 +520,10 @@ void timerIsr() {
       break;
     case 2:           // SCHRITT 3
       Taktzaehler++;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);       
+      flag = 0;*/
       lc.setLed(0,7,2,true);
       lc.setLed(0,7,1,false);
       digitalWrite(latchPin, LOW);
@@ -417,6 +533,10 @@ void timerIsr() {
       break;
     case 3:           // SCHRITT 4
       Taktzaehler++;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);       
+      flag = 0;*/
       lc.setLed(0,7,3,true);
       lc.setLed(0,7,2,false);
       digitalWrite(latchPin, LOW);
@@ -426,6 +546,10 @@ void timerIsr() {
       break;
     case 4:           // SCHRITT 5
       Taktzaehler++;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);      
+      flag = 0;*/
       lc.setLed(0,7,4,true);
       lc.setLed(0,7,3,false);
       digitalWrite(latchPin, LOW);
@@ -435,6 +559,10 @@ void timerIsr() {
       break;
     case 5:           // SCHRITT 6
       Taktzaehler++;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);     
+      flag = 0;*/
       lc.setLed(0,7,5,true);
       lc.setLed(0,7,4,false);
       digitalWrite(latchPin, LOW);
@@ -444,6 +572,10 @@ void timerIsr() {
       break;
     case 6:           // SCHRITT 7
       Taktzaehler++;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);     
+      flag = 0;*/
       lc.setLed(0,7,6,true);
       lc.setLed(0,7,5,false);
       digitalWrite(latchPin, LOW);
@@ -453,6 +585,10 @@ void timerIsr() {
       break;
     case 7:           // SCHRITT 8
       Taktzaehler = 0;
+      /*flag = 1;       
+      PORTA = B11111111;       
+      delayMicroseconds(30000);    
+      flag = 0;*/
       lc.setLed(0,7,7,true);
       lc.setLed(0,7,6,false);
       digitalWrite(latchPin, LOW);
