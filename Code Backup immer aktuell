@@ -1,3 +1,21 @@
+Skip to content
+ 
+Search or jump to…
+
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@jakhal 
+0
+0 0 jakhal/casio-sa-77-gruppe-9
+ Code  Issues 0  Pull requests 0  Projects 0  Wiki  Insights  Settings
+casio-sa-77-gruppe-9/Code Backup immer aktuell
+@jakhal jakhal Update Code Backup immer aktuell
+8d09487 10 minutes ago
+742 lines (687 sloc)  24.1 KB
+    
 #include <TimerThree.h>
 #include <LCDMenuLib2.h>
 #include "LedControl.h"
@@ -28,8 +46,9 @@ bool currentpattern[5][8]  = {
   {0,0,0,0,0,0,0,0},  //BONGO INNEN = 3
   {0,0,0,0,0,0,0,0},  //BONGO AUßEN = 4
 };
-/*bool kick[8]       ={1,0,1,0,1,0,1,0};  //KICK
-bool snare[8]      ={0,0,1,0,0,0,1,0};  //SNARE
+/*
+bool kick[8]                                                                        ={1,0,1,0,1,0,1,0};  //KICK
+bool snare[8]           ={0,0,1,0,0,0,1,0};  //SNARE
 bool hat[8]        ={1,1,1,1,1,1,1,1};  //HIGHHAT
 bool bongoinnen[3][8] ={0,0,0,1,0,0,0,1};  //BONGO INNEN
 bool bongoaussen[4][8]={0,0,0,0,0,0,0,0};  //BONGO AUßEN
@@ -739,3 +758,15 @@ int bit3 = 0;
 
   potiWert = analogRead(A0);
   */
+© 2019 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Help
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
