@@ -1,44 +1,40 @@
-Skip to content
- 
-Search or jump to…
+// EINBINDUNG BIBLIOTHEKEN:
 
-Pull requests
-Issues
-Marketplace
-Explore
- 
-@jakhal 
-0
-0 0 jakhal/casio-sa-77-gruppe-9
- Code  Issues 0  Pull requests 0  Projects 0  Wiki  Insights  Settings
-casio-sa-77-gruppe-9/Code Backup immer aktuell
-@jakhal jakhal Update Code Backup immer aktuell
-8d09487 10 minutes ago
-742 lines (687 sloc)  24.1 KB
-    
-#include <TimerThree.h>
-#include <LCDMenuLib2.h>
-#include "LedControl.h"
-#include "TimerOne.h"
-#include <LiquidCrystal.h>
-#include <string.h>
+#include <TimerThree.h>     // Bibliothek Timer1
+#include "TimerOne.h"       // Bibliothek Timer3
+#include <LCDMenuLib2.h>    // Bibliothek für LCD-Menü
+#include <LiquidCrystal.h>  // Bibliothek Ansteuerung LCD
+#include <string.h>         // nicht mehr benötigt?
+#include "LedControl.h"     // Bibliothek Ansteuerung LED-Matrix-Elemente
 
+// PLAY-STOP-BUTTON:
 
 int state = HIGH;      // the current state of the output pin
-int reading;           // the current reading from the input pin <-- PLAY STOP BUTTON KRAM
+int reading;           // the current reading from the input pin 
 int previous = LOW;    // the previous reading from the input pin
 int PlayStopButton = 5; // 
-long interruptinterval = 500000;
-float bpm =0;
-int Patternlenght = 7;
-int testdelay = 60;
 
-// the follow variables are long's because the time, measured in miliseconds,
-// will quickly become a bigger number than can be stored in an int.
+// Diverse Variablen (Step, Patternlänge, BPM-Zahl etc.)
+
+long interruptinterval = 500000;
+float bpm = 0;
+int Patternlenght = 7; 
+int testdelay = 60;
+int Taktzaehler = 0;
+
+// Variablen Tasterabfrage
+
 long time = 0;  
 long time2 = 0; // the last time the output pin was toggled
 long debounce2 = 200;
 long debounce = 200;   // the debounce time, increase if the output flickers
+int buttonpinshori[8]  ={A8,A9,A10,A11,A12,A13,A14,A15};
+int buttonpinsvert[5]  ={48,49,50,51,52};
+int lastbuttonstatehori[8]={0,0,0,0,0,0,0,0};
+int lastbuttonstatevert[5]={0,0,0,0,0};
+
+// 2D-Array - Aktuelles Pattern:
+
 bool currentpattern[5][8]  = {    
   {0,0,0,0,0,0,0,0},  //KICK = 0
   {0,0,0,0,0,0,0,0},  //SNARE = 1
@@ -46,16 +42,19 @@ bool currentpattern[5][8]  = {
   {0,0,0,0,0,0,0,0},  //BONGO INNEN = 3
   {0,0,0,0,0,0,0,0},  //BONGO AUßEN = 4
 };
-/*
-bool kick[8]                                                                        ={1,0,1,0,1,0,1,0};  //KICK
+/* ALTE VARIANTE! - ERSETZT DURCH: currentpattern
+bool kick[8]            ={1,0,1,0,1,0,1,0};  //KICK
 bool snare[8]           ={0,0,1,0,0,0,1,0};  //SNARE
-bool hat[8]        ={1,1,1,1,1,1,1,1};  //HIGHHAT
-bool bongoinnen[3][8] ={0,0,0,1,0,0,0,1};  //BONGO INNEN
-bool bongoaussen[4][8]={0,0,0,0,0,0,0,0};  //BONGO AUßEN
-bool extra1[8]     ={0,0,0,0,0,0,0,0};
-bool extra2[8]     ={0,0,0,0,0,0,0,0};
-bool extra3[8]     ={0,0,0,0,0,0,0,0};
+bool hat[8]             ={1,1,1,1,1,1,1,1};  //HIGHHAT
+bool bongoinnen[3][8]   ={0,0,0,1,0,0,0,1};  //BONGO INNEN
+bool bongoaussen[4][8]  ={0,0,0,0,0,0,0,0};  //BONGO AUßEN
+bool extra1[8]          ={0,0,0,0,0,0,0,0};
+bool extra2[8]          ={0,0,0,0,0,0,0,0};
+bool extra3[8]          ={0,0,0,0,0,0,0,0};
 */
+
+// PATTERNSPEICHER (3x 2D-Array):
+
 bool save1[5][8]   = {
   {0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0},
@@ -77,53 +76,36 @@ bool save3[5][8]   = {
   {0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0},
 };
-int buttonpinshori[8]  ={A8,A9,A10,A11,A12,A13,A14,A15};
-int buttonpinsvert[5]  ={48,49,50,51,52};
-int lastbuttonstatehori[8]={0,0,0,0,0,0,0,0};
-int lastbuttonstatevert[5]={0,0,0,0,0};
- 
-int Taktzaehler = 0;
+
+// PINBELEGUNG LCD:
 
 const int rs = A4, en = A5, d4 = A0, d5 = A1, d6 = A2, d7 = A3;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-/*const int buttonpin1 = 40;
-const int buttonpin2 = 41;
-const int buttonpin3 = 42;
-const int buttonpin4 = 43;
-const int buttonpin5 = 44;
-const int buttonpin6 = 45;
-const int buttonpin7 = 46;
-const int buttonpin8 = 47;
-const int buttonpin9 = 48;
-const int buttonpin10 = 49;
-const int buttonpin11 = 50;
-const int buttonpin12 = 51;
-*/
+
+// PINBELEGUNG LED-Matrix-Elemente:
 
 LedControl lc=LedControl(12,11,10,1);
 
-//Pin connected to latch pin (ST_CP) of 74HC595
-const int latchPin = 8;
-//Pin connected to clock pin (SH_CP) of 74HC595
-const int clockPin = 9;
-////Pin connected to Data in (DS) of 74HC595
-const int dataPin = 7;
+// PINBELEGUNG Schieberegister für 7Seg-Anzeige (Anzeige des aktuellen Steps)
 
-const int numReadings = 10; // POTI PATTERNLÄNGE SMOOTHING
+const int latchPin = 8;
+const int clockPin = 9;
+const int dataPin = 7;
 
 int input = 0;
 
 volatile int pullupinterval = 30000;
 
+const int numReadings = 10;     // POTI PATTERNLÄNGE SMOOTHING
 int readings[numReadings];      // the readings from the analog input
 int readIndex = 0;              // the index of the current reading
 int total = 0;                  // the running total
 int average = 0;                // the average
 
-int savepin = 3;
-int recallpin = 4;
+int savepin = 3;    // Taster zum Speichern von Patterns an D3
+int recallpin = 4;  // Taster zum Aufrufen von Patterns an D4
 
-volatile bool flag = 1;
+volatile bool flag = 1; // Flag-Variable zum (De)-Aktivieren der ISR "chipansteuerung"
 
 void setup() {
   DDRC = B00000000; // PORTC = EINGANG
@@ -144,24 +126,18 @@ void setup() {
   Serial1.begin(31250); // Initialisierung Serielle Verbindung MIDI
   Serial.begin(9600);
 
-  Timer1.initialize(interruptinterval); // Initialisierung Interupt (Startintervall 500000 microsec)
+  Timer1.initialize(interruptinterval); // Initialisierung Interrupt (Startintervall 500000 microsec)
   Timer1.attachInterrupt(timerIsr); // Serviceroutine: "timerIsr"
 
-  Timer3.initialize(interruptinterval/2); // Initialisierung Interupt
-  Timer3.attachInterrupt(pulluproutine); // Serviceroutine: "pulluproutine"
+  Timer3.initialize(interruptinterval/2); // Initialisierung Interrupt
+  Timer3.attachInterrupt(pulluproutine); // Serviceroutine: "pulluproutine" 
 
-  attachInterrupt(digitalPinToInterrupt(2), chipansteuerung, FALLING);
   
+
+  attachInterrupt(digitalPinToInterrupt(2), chipansteuerung, FALLING); // Initialisierung Hardwareinterrupt der Drum-Reihe bei fallender Flanke, Serviceroutine: chipansteuerung
+
+ // Setup diverser pinModes:
   pinMode(PlayStopButton, INPUT);
-  /*pinMode(38, INPUT);
-  pinMode(41, INPUT);
-  pinMode(42, INPUT);
-  pinMode(43, INPUT);
-  pinMode(44, INPUT);
-  pinMode(45, INPUT);
-  pinMode(46, INPUT);
-  pinMode(47, INPUT);
-  */
   pinMode(48, INPUT);
   pinMode(49, INPUT);
   pinMode(50, INPUT);
@@ -185,9 +161,7 @@ void setup() {
   pinMode(4, INPUT);
   pinMode(13, OUTPUT);
  
-    // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);
-  // Print a message to the LCD.
+  lcd.begin(16, 2); // Setup LCD (16 Reihen, 2 Zeilen)
   
   for (int thisReading = 0; thisReading < numReadings; thisReading++) { // POTI SMOOTHING
     readings[thisReading] = 0;
@@ -202,9 +176,6 @@ void loop() {
   displayprog();
   savepattern();
   recallpattern();
-  Serial.println(flag);
-  //PORTC = input;
-  //PORTA = B11111111;
   
   // KICK:  B11111011; ALLE:          B01000011;                                                                                 KICK & SNARE & HIHAT:  B11010011  ;  KICK & HIHAT & BONGIN: B11001011; SNARE & HIHAT & BONGIN: B11000111; HIHAT & BONGIN & BONGOU: B01001111;  SNARE & HIHAT & BONGIN & BONGOUT: B01000111;
   // SNARE: B11110111; KICK & SNARE:  B11110011; SNARE & HH:      B11010111; HH & BONGIN: B11001111; BONGIN & BONGOU: B01101111; KICK & SNARE & BONGIN: B11100011;  KICK & HIHAT & BONGOU: B01011011; SNARE & HIHAT & BONGOU: B01010111; KICK & SNARE & HIHAT & BONGIN: B11000011;
@@ -214,12 +185,12 @@ void loop() {
 }
 
 void pulluproutine(){
-  flag = !flag;
+  flag = !flag; // Setzen einer Flag um Chipansteuerung ??????????????????????????????????????????????
 }
 void chipansteuerung(){
   if (flag != 1){
- digitalWrite(13, HIGH);
-  if (Taktzaehler != -1){
+ digitalWrite(13, HIGH); // NUR ZUR UNTERSUCHUNG DES ABLAUFS MIT OSZILLOSKOP
+  if (Taktzaehler != -1){ // weil TAKTZÄHLER = -1 bedeutet STOP
   if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false) 
     { // NUR KICK
     PORTA = B11111011;
@@ -339,40 +310,37 @@ void chipansteuerung(){
   delayMicroseconds(testdelay);
   PORTA = B11111111;
   }
-  digitalWrite(13, LOW);
+  digitalWrite(13, LOW); // NUR ZUR UNTERSUCHUNG DES ABLAUFS MIT OSZILLOSKOP
 }
 else {};
 }
-void savepattern(){
+void savepattern(){ // AKTUELLES PATTERN SPEICHERN
   if(digitalRead(savepin)==HIGH){
-    memcpy(save1, currentpattern, sizeof(save1));
+    memcpy(save1, currentpattern, sizeof(save1)); // Inhalt des Arrays für das aktuelle Pattern in Speicherarray 1 (save1) kopieren
   }
   else{};
 }
-void recallpattern(){
+void recallpattern(){ // GESPEICHERTES PATTERN LADEN
   if(digitalRead(recallpin)==HIGH){
-    memcpy(currentpattern, save1, sizeof(currentpattern));
+    memcpy(currentpattern, save1, sizeof(currentpattern)); // Inhalt des Speicherarrays 1 in das Array für das aktuelle Pattern kopieren
   }
   else{};
 }
-void displayprog(){
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
-  lcd.setCursor(0, 0);
-  lcd.print("Patternlaenge: ");
+void displayprog(){ // ANSTEUERUNG LCD
+  lcd.setCursor(0, 0);          // Cursor auf Spalte 0, Reihe 0 setzen
+  lcd.print("Patternlaenge: "); // PATTERNLÄNGE ANZEIGEN
   lcd.print(Patternlenght+1);
-  lcd.setCursor(0, 1);
-  // print the number of seconds since reset:
+  lcd.setCursor(0, 1);          // BPM ANZEIGEN
   lcd.print("BPM: ");
   lcd.print(bpm);
-  lcd.setCursor(8, 1);
-  lcd.print(" Step: ");
+  lcd.setCursor(8, 1); 
+  lcd.print(" Step: ");         // AKTUELLEN STEP ANZEIGEN
   lcd.print(Taktzaehler);
   
 }
-void checkPatternlenght(){
+void checkPatternlenght(){ //POTI zur Einstellung der PATTERNLÄNGE einlesen und viel SMOOTHING
    // subtract the last reading:
-  total = total - readings[readIndex];
+  total = total - readings[readIndex]; 
   // read from the sensor:
   readings[readIndex] = map (analogRead(A7),0,1023,0,8); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
   // add the reading to the total:
@@ -389,36 +357,33 @@ void checkPatternlenght(){
   // calculate the average:
 Patternlenght = total / numReadings;
   //Patternlenght = map (analogRead(A7),0,1023,0,8); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
+
+// PATTERNLÄNGE AUF LED-MATRIX SETZEN:
+
   if (Patternlenght != 8){
   for (int x = 0; x<8; x++)
       {
-        lc.setLed(0,6,x,false);
+        lc.setLed(0,6,x,false); // LEDs in Reihe 7 deaktivieren
       }
   }
-  lc.setLed(0,6,Patternlenght,true);
+  lc.setLed(0,6,Patternlenght,true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
 }
 void checkTempo() {
-  bpm = 60000000/interruptinterval;
-  /*Serial.print("BPM: ");
-  Serial.println(bpm);
-  Serial.print("Patternlänge: ");
-  Serial.println(Patternlenght+1);
-  */
-  if (digitalRead(6))
+  bpm = 60000000/interruptinterval; // Berechnung der BPM ausgehend vom Interval des Interrupts welcher den aktuellen Step erhöht
+
+  if (digitalRead(6)) // ABFRAGE TASTER ZUR FREIGABE DER EINSTELLUNG DES TEMPOS
   {
-  //Timer1.detachInterrupt();
-  //Timer1.attachInterrupt( timerIsr,map(analogRead(A6),0,1023,100000,10000000)); // attach the service routine here  
   interruptinterval = map(analogRead(A6),0,1023,40000,900000);
-  Timer1.setPeriod(interruptinterval);
-  Timer3.setPeriod(interruptinterval/2); 
+  Timer1.setPeriod(interruptinterval);    // NEUINITIALISIERUNG DES INTERRUPTINTERVALS - TIMER1
+  Timer3.setPeriod(interruptinterval/2);  // NEUINITIALISIERUNG DES INTERRUPTINTERVALS - TIMER3 
   while(!digitalRead(6)){}
   }
 }
 
-/* keine midi ansteuerung mehr
-*/
 void timerIsr() {
-  /*if (Taktzaehler != -1){
+  /* MIDI-AUSGABE:
+   
+  if (Taktzaehler != -1){
   if (currentpattern[0][Taktzaehler] == true)
     {
     do{
@@ -509,10 +474,6 @@ void timerIsr() {
       break;
     case 0:           // SCHRITT 1 
       Taktzaehler++;
-      /*flag = 1;
-      PORTA = B11111111;
-      delayMicroseconds(30000); 
-      flag = 0;*/
       for (int x = 0; x<8; x++)
       {
         lc.setLed(0,7,x,false);
@@ -526,10 +487,6 @@ void timerIsr() {
       break;    
     case 1:           // SCHRITT 2 
       Taktzaehler++;
-      /*flag = 1;       
-      PORTA = B11111111;       
-      delayMicroseconds(30000);       
-      flag = 0;*/
       lc.setLed(0,7,1,true);
       lc.setLed(0,7,0,false);
       digitalWrite(latchPin, LOW);
@@ -539,10 +496,6 @@ void timerIsr() {
       break;
     case 2:           // SCHRITT 3
       Taktzaehler++;
-      /*flag = 1;       
-      PORTA = B11111111;       
-      delayMicroseconds(30000);       
-      flag = 0;*/
       lc.setLed(0,7,2,true);
       lc.setLed(0,7,1,false);
       digitalWrite(latchPin, LOW);
@@ -565,10 +518,6 @@ void timerIsr() {
       break;
     case 4:           // SCHRITT 5
       Taktzaehler++;
-      /*flag = 1;       
-      PORTA = B11111111;       
-      delayMicroseconds(30000);      
-      flag = 0;*/
       lc.setLed(0,7,4,true);
       lc.setLed(0,7,3,false);
       digitalWrite(latchPin, LOW);
@@ -578,10 +527,6 @@ void timerIsr() {
       break;
     case 5:           // SCHRITT 6
       Taktzaehler++;
-      /*flag = 1;       
-      PORTA = B11111111;       
-      delayMicroseconds(30000);     
-      flag = 0;*/
       lc.setLed(0,7,5,true);
       lc.setLed(0,7,4,false);
       digitalWrite(latchPin, LOW);
@@ -591,10 +536,6 @@ void timerIsr() {
       break;
     case 6:           // SCHRITT 7
       Taktzaehler++;
-      /*flag = 1;       
-      PORTA = B11111111;       
-      delayMicroseconds(30000);     
-      flag = 0;*/
       lc.setLed(0,7,6,true);
       lc.setLed(0,7,5,false);
       digitalWrite(latchPin, LOW);
@@ -604,10 +545,6 @@ void timerIsr() {
       break;
     case 7:           // SCHRITT 8
       Taktzaehler = 0;
-      /*flag = 1;       
-      PORTA = B11111111;       
-      delayMicroseconds(30000);    
-      flag = 0;*/
       lc.setLed(0,7,7,true);
       lc.setLed(0,7,6,false);
       digitalWrite(latchPin, LOW);
@@ -686,7 +623,7 @@ reading = digitalRead(PlayStopButton);
   }
  
 }
-void checkMatrix() 
+void checkMatrix() // AUSLESEN DES ARRAYS "currentpattern" und entsprechende Ansteuerung der LED-Matrix
 {
  int i;
  for (i = 0; i < 8; i = i + 1) 
@@ -734,39 +671,8 @@ void checkMatrix()
   }
 }
 
-void noteOn(int cmd, int pitch, int velocity) {
+void noteOn(int cmd, int pitch, int velocity) { // MIDI
   Serial1.write(cmd);
   Serial1.write(pitch);
   Serial1.write(velocity);
 }
-/*int potiWert = 0;
-int zaehler = 0;
-
-int bit1 = 0;
-int bit2 = 0;
-int bit3 = 0;
-
-  for ( zaehler = 0 ; zaehler <= 7; zaehler++ ) {
-
-  bit1 = bitRead(zaehler, 0);
-  bit2 = bitRead(zaehler, 1);
-  bit3 = bitRead(zaehler, 2);
-
-  digitalWrite(2, bit1);
-  digitalWrite(3, bit2);
-  digitalWrite(4, bit3);
-
-  potiWert = analogRead(A0);
-  */
-© 2019 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
