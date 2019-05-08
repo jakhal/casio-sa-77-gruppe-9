@@ -1,81 +1,57 @@
 // EINBINDUNG BIBLIOTHEKEN:
-
-#include <TimerThree.h>     // Bibliothek Timer1
-#include "TimerOne.h"       // Bibliothek Timer3
-#include <LCDMenuLib2.h>    // Bibliothek für LCD-Menü
-#include <LiquidCrystal.h>  // Bibliothek Ansteuerung LCD
-#include <string.h>         // nicht mehr benötigt?
-#include "LedControl.h"     // Bibliothek Ansteuerung LED-Matrix-Elemente
+#include <Arduino.h>
+#include <TimerThree.h>    // Bibliothek Timer1
+#include "TimerOne.h"      // Bibliothek Timer3
+#include <LCDMenuLib2.h>   // Bibliothek für LCD-Menü
+#include <LiquidCrystal.h> // Bibliothek Ansteuerung LCD
+#include <string.h>        // nicht mehr benötigt?
+#include "LedControl.h"    // Bibliothek Ansteuerung LED-Matrix-Elemente
 
 // PLAY-STOP-BUTTON:
 
-int state = HIGH;      // the current state of the output pin
-int reading;           // the current reading from the input pin 
-int previous = LOW;    // the previous reading from the input pin
-int PlayStopButton = 5; // 
+int state = HIGH;   // the current state
+int reading;        // the current reading from the input pin
+int previous = LOW; // the previous reading from the input pin
+int PlayStopButton = 5;
 
 // Diverse Variablen (Step, Patternlänge, BPM-Zahl etc.)
 
 int potiread = 0;
 long interruptinterval = 500000;
 float bpm = 0;
-int Patternlenght = 7; 
+int Patternlänge = 15;
 int testdelay = 60;
-int Taktzaehler = 0;
+int Schrittzähler = 0;
 
 // Variablen Tasterabfrage
 
-long time = 0;  
-long time2 = 0; // the last time the output pin was toggled
+long time = 0;
+long time2 = 0;
 long debounce2 = 200;
-long debounce = 200;   // the debounce time, increase if the output flickers
-int buttonpinshori[8]  ={A8,A9,A10,A11,A12,A13,A14,A15};
-int buttonpinsvert[5]  ={48,49,50,51,52};
-int lastbuttonstatehori[8]={0,0,0,0,0,0,0,0};
-int lastbuttonstatevert[5]={0,0,0,0,0};
+long debounce = 200;
+int buttonpinshori[8] = {A8, A9, A10, A11, A12, A13, A14, A15};
+int buttonpinsvert[5] = {48, 49, 50, 51, 52};
+int lastbuttonstatehori[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+int lastbuttonstatevert[5] = {0, 0, 0, 0, 0};
 
 // 2D-Array - Aktuelles Pattern:
 
-bool currentpattern[5][16]  = {    
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},  //KICK = 0
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},  //SNARE = 1
-  {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},  //HIGHHAT = 2
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},  //BONGO INNEN = 3
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},  //BONGO AUßEN = 4
+bool currentpattern[5][16] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, //KICK = 0
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, //SNARE = 1
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, //HIGHHAT = 2
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, //BONGO INNEN = 3
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, //BONGO AUßEN = 4
 };
-/* ALTE VARIANTE! - ERSETZT DURCH: currentpattern
-bool kick[8]            ={1,0,1,0,1,0,1,0};  //KICK
-bool snare[8]           ={0,0,1,0,0,0,1,0};  //SNARE
-bool hat[8]             ={1,1,1,1,1,1,1,1};  //HIGHHAT
-bool bongoinnen[3][8]   ={0,0,0,1,0,0,0,1};  //BONGO INNEN
-bool bongoaussen[4][8]  ={0,0,0,0,0,0,0,0};  //BONGO AUßEN
-bool extra1[8]          ={0,0,0,0,0,0,0,0};
-bool extra2[8]          ={0,0,0,0,0,0,0,0};
-bool extra3[8]          ={0,0,0,0,0,0,0,0};
-*/
 
-// PATTERNSPEICHER (3x 2D-Array):
+// PATTERNSPEICHER (2D-Array):
 
-bool save1[5][8]   = {
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-};
-bool save2[5][8]   = {
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-};
-bool save3[5][8]   = {
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0},
+bool save1[5][16] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 
 // PINBELEGUNG LCD:
@@ -85,62 +61,37 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // PINBELEGUNG LED-Matrix-Elemente:
 
-LedControl lc=LedControl(12,11,10,8);
+LedControl lc = LedControl(12, 11, 10, 4);
 
-// PINBELEGUNG Schieberegister für 7Seg-Anzeige (Anzeige des aktuellen Steps)
-
-const int latchPin = 8;
-const int clockPin = 9;
-const int dataPin = 7;
-
-int input = 0;
-
-volatile int pullupinterval = 30000;
-
-const int numReadings = 10;     // POTI PATTERNLÄNGE SMOOTHING
-int readings[numReadings];      // the readings from the analog input
-int readIndex = 0;              // the index of the current reading
-int total = 0;                  // the running total
-int average = 0;                // the average
-
-int savepin = 3;    // Taster zum Speichern von Patterns an D3
-int recallpin = 4;  // Taster zum Aufrufen von Patterns an D4
+int savepin = 3;   // Taster zum Speichern von Patterns an D3
+int recallpin = 4; // Taster zum Aufrufen von Patterns an D4
 
 volatile bool flag = 1; // Flag-Variable zum (De)-Aktivieren der ISR "chipansteuerung"
 
-void setup() {
+void setup()
+{
   DDRC = B00000000; // PORTC = EINGANG
   DDRA = B11111111; // PORTA = AUSGANG
 
-  for (int i=0; i<8; i++){
-  lc.shutdown(i,false); // Initialisierung LED Matrix
-  lc.setIntensity(i,8);
-  lc.clearDisplay(i); 
+  for (int i = 0; i < 4; i++)
+  {
+    lc.shutdown(i, false); // Initialisierung LED Matrix
+    lc.setIntensity(i, 8);
+    lc.clearDisplay(i);
   }
-  
-
-  // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);
-  // Print a message to the LCD.
-
-  pinMode(latchPin, OUTPUT); // PINS 74HC595 Schieberegister 7Seg-Anzeige
-  pinMode(dataPin, OUTPUT);  
-  pinMode(clockPin, OUTPUT);
 
   Serial1.begin(31250); // Initialisierung Serielle Verbindung MIDI
-  Serial.begin(9600);
+  Serial.begin(9600);   // Initialisierung Serielle Verbindung zwecks Debugging
 
-  Timer1.initialize(interruptinterval); // Initialisierung Interrupt (Startintervall 500000 microsec)
-  Timer1.attachInterrupt(timerIsr); // Serviceroutine: "timerIsr"
+  Timer1.initialize(interruptinterval);   // Initialisierung Interrupt (Startintervall 500000 microsec = 0,5 sec)
+  Timer1.attachInterrupt(schritthochzählen); // Serviceroutine: "schritthochzählen"
 
-  Timer3.initialize(interruptinterval/2); // Initialisierung Interrupt
-  Timer3.attachInterrupt(pulluproutine); // Serviceroutine: "pulluproutine" 
-
-  
+  Timer3.initialize(interruptinterval / 2); // Initialisierung Interrupt
+  Timer3.attachInterrupt(setFlag);    // Serviceroutine: "setFlag"
 
   attachInterrupt(digitalPinToInterrupt(2), chipansteuerung, FALLING); // Initialisierung Hardwareinterrupt der Drum-Reihe bei fallender Flanke, Serviceroutine: chipansteuerung
 
- // Setup diverser pinModes:
+  // Setup diverser pinModes:
   pinMode(PlayStopButton, INPUT);
   pinMode(48, INPUT);
   pinMode(49, INPUT);
@@ -164,937 +115,897 @@ void setup() {
   pinMode(3, INPUT);
   pinMode(4, INPUT);
   pinMode(13, OUTPUT);
- 
+
   lcd.begin(16, 2); // Setup LCD (16 Reihen, 2 Zeilen)
-  
-  for (int thisReading = 0; thisReading < numReadings; thisReading++) { // POTI SMOOTHING
-    readings[thisReading] = 0;
-  }
 }
 
-void loop() {
+void loop()
+{
   checkMatrix();
   checkButtons();
   checkTempo();
-  checkPatternlenght();
-  displayprog();
-  savepattern();
-  recallpattern();
-  
-  // KICK:  B11111011; ALLE:          B01000011;                                                                                 KICK & SNARE & HIHAT:  B11010011  ;  KICK & HIHAT & BONGIN: B11001011; SNARE & HIHAT & BONGIN: B11000111; HIHAT & BONGIN & BONGOU: B01001111;  SNARE & HIHAT & BONGIN & BONGOUT: B01000111;
-  // SNARE: B11110111; KICK & SNARE:  B11110011; SNARE & HH:      B11010111; HH & BONGIN: B11001111; BONGIN & BONGOU: B01101111; KICK & SNARE & BONGIN: B11100011;  KICK & HIHAT & BONGOU: B01011011; SNARE & HIHAT & BONGOU: B01010111; KICK & SNARE & HIHAT & BONGIN: B11000011;
-  // HIHAT: B11011111; KICK & HH:     B11011011; SNARE & BONGIN:  B11100111; HH & BONGOU: B01011111;                             KICK & SNARE & BONGOU: B01110011;  KICK & BONGI & BONGOU: B01101011; SNARE & BONGI & BONGOU: B01100111; KICK & SNARE & HIHAT & BONGOU: B01010011;
-  //BONGIN: B11101111; KICK & BONGIN: B11101011; SNARE & BONGOU:  B01110111; 
-  //BONGOU: B01111111; KICK & BONGOU: B01111011;
+  checkPatternlänge();
+  printLCD();
 }
 
-void pulluproutine(){
-  flag = !flag; // Setzen einer Flag um Chipansteuerung ??????????????????????????????????????????????
+void setFlag()
+{
+  flag = !flag; // Setzen einer Flag um chipansteuerung() immer nur einmal pro Step auszuführen
 }
-void chipansteuerung(){
-  if (flag != 1){
- digitalWrite(13, HIGH); // NUR ZUR UNTERSUCHUNG DES ABLAUFS MIT OSZILLOSKOP
-  if (Taktzaehler != -1){ // weil TAKTZÄHLER = -1 bedeutet STOP
-  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false) 
-    { // NUR KICK
-    PORTA = B11111011;
+void chipansteuerung()
+{
+  if (flag != 1)
+  {
+    digitalWrite(13, HIGH); // NUR ZUR UNTERSUCHUNG DES ABLAUFS MIT OSZILLOSKOP
+    if (Schrittzähler != -1)
+    { // weil TAKTZÄHLER = -1 bedeutet STOP
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // NUR KICK
+        PORTA = B11111011;
+      }
+      if (currentpattern[1][Schrittzähler] == true && currentpattern[0][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // NUR SNARE
+        PORTA = B11110111;
+      }
+      if (currentpattern[2][Schrittzähler] == true && currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // NUR HIHAT
+        PORTA = B11011111;
+      }
+      if (currentpattern[3][Schrittzähler] == true && currentpattern[0][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // NUR BONGOINNEN
+        PORTA = B11101111;
+      }
+      if (currentpattern[4][Schrittzähler] == true && currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false)
+      { // NUR BONGOAUßEN
+        PORTA = B01111111;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == true)
+      { // ALLE
+        PORTA = B01000011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // KICK & SNARE
+        PORTA = B11110011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // KICK & HIHAT
+        PORTA = B11011011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // KICK & BONGIN
+        PORTA = B11101011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // KICK & BONGOUT
+        PORTA = B01111011;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // SNARE & HIHAT
+        PORTA = B11010111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // SNARE & BONGIN
+        PORTA = B11100111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // SNARE & BONGOUT
+        PORTA = B01110111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // HIHAT & BONGIN
+        PORTA = B11001111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // HIHAT & BONGOUT
+        PORTA = B01011111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == true)
+      { // BONGIN & BONGOUT
+        PORTA = B01101111;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == false)
+      { // KICK & SNARE & HIHAT
+        PORTA = B11010011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // KICK & SNARE & BONGIN
+        PORTA = B11100011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // KICK & SNARE & BONGOU
+        PORTA = B01110011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // KICK & HIHAT & BONGIN
+        PORTA = B11001011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // KICK & HIHAT & BONGOU
+        PORTA = B01011011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == true)
+      { // KICK & BONGIN & BONGOU
+        PORTA = B01101011;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // SNARE & HIHAT & BONGIN
+        PORTA = B11000111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // SNARE & HIHAT & BONGOU
+        PORTA = B01010111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == false && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == true)
+      { // SNARE & BONGIN & BONGOUT
+        PORTA = B01100111;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == false && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == true)
+      { // HIHAT & BONGIN & BONGOU
+        PORTA = B01001111;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == false)
+      { // KICK & SNARE & HIHAT & BONGIN
+        PORTA = B11000011;
+      }
+      if (currentpattern[0][Schrittzähler] == true && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == false && currentpattern[4][Schrittzähler] == true)
+      { // KICK & SNARE & HIHAT & BONGOUT
+        PORTA = B01010011;
+      }
+      if (currentpattern[0][Schrittzähler] == false && currentpattern[1][Schrittzähler] == true && currentpattern[2][Schrittzähler] == true && currentpattern[3][Schrittzähler] == true && currentpattern[4][Schrittzähler] == true)
+      { // SNARE & HIHAT & BONGIN & BONGOUT
+        PORTA = B01000111;
+      }
+      delayMicroseconds(testdelay); // 60 Mikrosekunden Delay
+      PORTA = B11111111;
     }
-  if (currentpattern[1][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
-    { // NUR SNARE
-    PORTA = B11110111; 
-    }
-  if (currentpattern[2][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
-    { // NUR HIHAT
-    PORTA = B11011111;
-    }
-  if (currentpattern[3][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
-    { // NUR BONGOINNEN
-    PORTA = B11101111; 
-    } 
-  if (currentpattern[4][Taktzaehler] == true && currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false)
-    { // NUR BONGOAUßEN
-    PORTA = B01111111; 
-    }
-  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
-    { // ALLE
-    PORTA = B01000011; 
-    }
-   if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
-    { // KICK & SNARE
-    PORTA = B11110011; 
-    }
-  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
-    { // KICK & HIHAT
-    PORTA = B11011011; 
-    }
-   if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
-  { // KICK & BONGIN
-    PORTA = B11101011;
+    digitalWrite(13, LOW); // NUR ZUR UNTERSUCHUNG DES ABLAUFS MIT OSZILLOSKOP (Debugging)
   }
-  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
-  { // KICK & BONGOUT
-    PORTA = B01111011;
-  }
-    if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
-  { // SNARE & HIHAT
-    PORTA = B11010111;
-  }
-  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
-  { // SNARE & BONGIN
-    PORTA = B11100111;
-  }
-  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
- { // SNARE & BONGOUT
-  PORTA = B01110111;
- }
- if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
- { // HIHAT & BONGIN
-  PORTA = B11001111;
- }
- if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
-  { // HIHAT & BONGOUT
-   PORTA = B01011111;
-  }
-  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
-  { // BONGIN & BONGOUT
-   PORTA = B01101111;
-  }
-  if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == false)
- { // KICK & SNARE & HIHAT
-  PORTA = B11010011;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
- { // KICK & SNARE & BONGIN
-  PORTA = B11100011;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
- { // KICK & SNARE & BONGOU
-  PORTA = B01110011;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
- { // KICK & HIHAT & BONGIN
-  PORTA = B11001011;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
- { // KICK & HIHAT & BONGOU
-  PORTA = B01011011;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
- { // KICK & BONGIN & BONGOU
-  PORTA = B01101011;
- }
- if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
- { // SNARE & HIHAT & BONGIN
-  PORTA = B11000111;
- }
- if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
- { // SNARE & HIHAT & BONGOU
-  PORTA = B01010111;
- }
- if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == false && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
- { // SNARE & BONGIN & BONGOUT
-  PORTA = B01100111;
- }
-  if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == false && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
- { // HIHAT & BONGIN & BONGOU
-  PORTA = B01001111;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == false)
- { // KICK & SNARE & HIHAT & BONGIN
- PORTA = B11000011;
- }
- if (currentpattern[0][Taktzaehler] == true && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == false && currentpattern[4][Taktzaehler] == true)
- { // KICK & SNARE & HIHAT & BONGOUT
-  PORTA = B01010011;
- }
- if (currentpattern[0][Taktzaehler] == false && currentpattern[1][Taktzaehler] == true && currentpattern[2][Taktzaehler] == true && currentpattern[3][Taktzaehler] == true && currentpattern[4][Taktzaehler] == true)
- { // SNARE & HIHAT & BONGIN & BONGOUT
-  PORTA = B01000111;
- }
-  delayMicroseconds(testdelay);
-  PORTA = B11111111;
-  }
-  digitalWrite(13, LOW); // NUR ZUR UNTERSUCHUNG DES ABLAUFS MIT OSZILLOSKOP
+  else
+  {
+  };
 }
-else {};
+void savePattern()
+{                                               // AKTUELLES PATTERN SPEICHERN
+  memcpy(save1, currentpattern, sizeof(save1)); // Inhalt des Arrays für das aktuelle Pattern in Speicherarray 1 (save1) kopieren
 }
-void savepattern(){ // AKTUELLES PATTERN SPEICHERN
-  if(digitalRead(savepin)==HIGH){
-    memcpy(save1, currentpattern, sizeof(save1)); // Inhalt des Arrays für das aktuelle Pattern in Speicherarray 1 (save1) kopieren
-  }
-  else{};
+void recallPattern()
+{                                                        // GESPEICHERTES PATTERN LADEN
+  memcpy(currentpattern, save1, sizeof(currentpattern)); // Inhalt des Speicherarrays 1 in das Array für das aktuelle Pattern kopieren
 }
-void recallpattern(){ // GESPEICHERTES PATTERN LADEN
-  if(digitalRead(recallpin)==HIGH){
-    memcpy(currentpattern, save1, sizeof(currentpattern)); // Inhalt des Speicherarrays 1 in das Array für das aktuelle Pattern kopieren
-  }
-  else{};
-}
-void displayprog(){ // ANSTEUERUNG LCD
-  lcd.setCursor(0, 0);          // Cursor auf Spalte 0, Reihe 0 setzen
+void printLCD()
+{                              // ANSTEUERUNG LCD
+  lcd.setCursor(0, 0);         // Cursor auf Spalte 0, Reihe 0 setzen
   lcd.print("Patternlaenge:"); // PATTERNLÄNGE ANZEIGEN
-  lcd.print(Patternlenght);
-  lcd.setCursor(0, 1);          // BPM ANZEIGEN
+  lcd.print(Patternlänge);
+  lcd.setCursor(0, 1); // BPM ANZEIGEN
   lcd.print("BPM: ");
   lcd.print(bpm);
-  lcd.setCursor(8, 1); 
-  lcd.print(" Step:");         // AKTUELLEN STEP ANZEIGEN
-  lcd.print(Taktzaehler);
-  
+  lcd.setCursor(8, 1);
+  lcd.print(" Step:"); // AKTUELLEN STEP ANZEIGEN
+  lcd.print(Schrittzähler);
 }
-void checkPatternlenght(){ //POTI zur Einstellung der PATTERNLÄNGE einlesen und viel SMOOTHING
-/*   // subtract the last reading:
-  total = total - readings[readIndex]; 
-  // read from the sensor:
-  readings[readIndex] = map (analogRead(A7),0,1023,0,15); // = 8, weil Poti/ AnalogRead Fehlerhaft ist
-  // add the reading to the total:
-  total = total + readings[readIndex];
-  // advance to the next position in the array:
-  readIndex = readIndex + 1;
+void checkPatternlänge()
+{ //POTI zur Einstellung der PATTERNLÄNGE abfragen
 
-  // if we're at the end of the array...
-  if (readIndex >= numReadings) {
-    // ...wrap around to the beginning:
-    readIndex = 0;
-  }
+  potiread = analogRead(A7);
+  Patternlänge = map(analogRead(A7), 0, 1000, 0, 15); // oberer Wert nicht 1023, weil analogRead Probleme macht?
 
-  // calculate the average:
-Patternlenght = total / numReadings; */
-potiread = analogRead(A7);
-Patternlenght = map(analogRead(A7),0,1000,0,15); // oberer Wert nicht 1023, weil DAC Probleme macht?
-// PATTERNLÄNGE AUF LED-MATRIX SETZEN:
+  // PATTERNLÄNGE AUF LED-MATRIX SETZEN:
 
-  if (Patternlenght != 16){ // macht nicht so viel sinn mit 16, da max 15!
-  for (int x = 0; x<16; x++)
-      {
-        lc.setLed(0,5,x,false); // LEDs in Reihe 7 deaktivieren
-        lc.setLed(1,5,x,false);
-        lc.setLed(2,5,x,false);
-        lc.setLed(3,5,x,false);
-      }
+  if (Patternlänge != 15)
+  { //
+    for (int x = 0; x < 16; x++)
+    {
+      lc.setLed(0, 5, x, false); // LEDs in Reihe 7 deaktivieren
+      lc.setLed(1, 5, x, false);
+      lc.setLed(2, 5, x, false);
+      lc.setLed(3, 5, x, false);
+    }
   }
-  if (Patternlenght < 5){
-    lc.setLed(3,5,Patternlenght*2,true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
-    lc.setLed(3,5,Patternlenght*2+1,true);
+  if (Patternlänge < 5)
+  {
+    lc.setLed(3, 5, Patternlänge * 2, true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
+    lc.setLed(3, 5, Patternlänge * 2 + 1, true);
   }
-  if (5 <= Patternlenght < 8){
-    lc.setLed(2,5,Patternlenght*2-10,true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
-    lc.setLed(2,5,Patternlenght*2+1-10,true);
+  if (5 <= Patternlänge < 8)
+  {
+    lc.setLed(2, 5, Patternlänge * 2 - 10, true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
+    lc.setLed(2, 5, Patternlänge * 2 + 1 - 10, true);
   }
-  if (8 <= Patternlenght < 12){
-    lc.setLed(1,5,Patternlenght*2-16,true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
-    lc.setLed(1,5,Patternlenght*2+1-16,true);
+  if (8 <= Patternlänge < 12)
+  {
+    lc.setLed(1, 5, Patternlänge * 2 - 16, true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
+    lc.setLed(1, 5, Patternlänge * 2 + 1 - 16, true);
   }
-  if (12<= Patternlenght < 16){
-    lc.setLed(0,5,Patternlenght*2-24,true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
-    lc.setLed(0,5,Patternlenght*2+1-24,true);
+  if (12 <= Patternlänge < 16)
+  {
+    lc.setLed(0, 5, Patternlänge * 2 - 24, true); // Die der aktuellen Patternlänge entsprechende LED aktivieren
+    lc.setLed(0, 5, Patternlänge * 2 + 1 - 24, true);
   }
-  
 }
-void checkTempo() {
-  bpm = 60000000/interruptinterval; // Berechnung der BPM ausgehend vom Interval des Interrupts welcher den aktuellen Step erhöht
+void checkTempo()
+{
+  bpm = 60000000 / interruptinterval; // Berechnung der BPM ausgehend vom Interval des Interrupts welcher den aktuellen Step erhöht
 
   if (digitalRead(6)) // ABFRAGE TASTER ZUR FREIGABE DER EINSTELLUNG DES TEMPOS
   {
-  interruptinterval = map(analogRead(A6),0,1023,40000,900000);
-  Timer1.setPeriod(interruptinterval);    // NEUINITIALISIERUNG DES INTERRUPTINTERVALS - TIMER1
-  Timer3.setPeriod(interruptinterval/2);  // NEUINITIALISIERUNG DES INTERRUPTINTERVALS - TIMER3 
-  while(!digitalRead(6)){}
+    interruptinterval = map(analogRead(A6), 0, 1023, 40000, 900000);
+    Timer1.setPeriod(interruptinterval);     // NEUINITIALISIERUNG DES INTERRUPTINTERVALS - TIMER1
+    Timer3.setPeriod(interruptinterval / 2); // NEUINITIALISIERUNG DES INTERRUPTINTERVALS - TIMER3
+    while (!digitalRead(6))
+    {
+    }
   }
 }
 
-void timerIsr() {
-  /* MIDI-AUSGABE:
+void schritthochzählen()
+{
+  /*MIDI-AUSGABE:
    
-  if (Taktzaehler != -1){
-  if (currentpattern[0][Taktzaehler] == true)
-    {
-    do{
-      PORTA =B11111111;
-    }
-    while(digitalRead(36)==HIGH);
-    PORTA = B11111011;
-    delayMicroseconds(testdelay);
-    //PORTA = B11111111;
-    /*noteOn(0x90,0x3C,0x7F);
+  if (Schrittzähler != -1)
+  {
+  if (currentpattern[0][Schrittzähler] == true)
+    noteOn(0x90,0x3C,0x7F);
     noteOn(0x90,0x3C,0x00);
-    noteOn(0x90,0x1E,0x7F);
-    noteOn(0x90,0x1E,0x00);
-    
     }
-  //else{PORTA = B11111111;}
-  if (currentpattern[1][Taktzaehler] == true)
+
+  if (currentpattern[1][Schrittzähler] == true)
     {
-    /*noteOn(0x90,0x3E,0x7F);
+    noteOn(0x90,0x3E,0x7F);
     noteOn(0x90,0x3E,0x00);
-    
-    switch (PORTC)
-    
-    do{
-    PORTA =B11111111;
     }
-    while(digitalRead(36)==HIGH);
-    PORTA = B11110111; 
-    delayMicroseconds(testdelay);
-    PORTA = B11111111;
-    }
-  //else{PORTA = B11111111;}
-  if (currentpattern[2][Taktzaehler] == true)
+  if (currentpattern[2][Schrittzähler] == true)
     {
-    do{
-    PORTA =B11111111;
-    }
-    while(digitalRead(36)==HIGH);
-    PORTA = B11011111;
-    delayMicroseconds(testdelay);
-    PORTA = B11111111;  
- 
     noteOn(0x90,0x3F,0x7F);
     noteOn(0x90,0x3F,0x00); 
 
     }
-  //else{PORTA = B11111111;}
-  if (currentpattern[3][Taktzaehler] == true)
-    {
-      
+  if (currentpattern[3][Schrittzähler] == true)
+    {  
     noteOn(0x90,0x40,0x7F);
-    noteOn(0x90,0x40,0x00); 
-    
-     do{
-    PORTA =B11111111;
+    noteOn(0x90,0x40,0x00);  
     }
-    while(digitalRead(36)==HIGH);
-    PORTA = B11101111; 
-    delayMicroseconds(testdelay);
-    PORTA = B11111111;  
-    } 
-  else{PORTA = B11111111;}
-  if (currentpattern[4][Taktzaehler] == true)
+  if (currentpattern[4][Schrittzähler] == true)
     {
     noteOn(0x90,0x41,0x7F);
     noteOn(0x90,0x41,0x00); 
-    
-    do{
-    PORTA =B11111111;
-    }
-    while(digitalRead(36)==HIGH);
-    PORTA = B01111111; 
-    delayMicroseconds(testdelay);
-    PORTA = B11111111;
-    } 
-  else{PORTA = B11111111;}
   }
  */
- switch (Taktzaehler) {
-    case -1: // STOP --- um Interrupt wieder zu starten, bei START-Druck Taktzaehler auf 0 setzen und Timer1.attachen
-      for (int x = 0; x<8; x++)
-      {
-        lc.setLed(0,7,x,false);
-        lc.setLed(1,7,x,false);
-        lc.setLed(2,7,x,false);
-        lc.setLed(3,7,x,false);
-        lc.setLed(0,6,x,false);
-        lc.setLed(1,6,x,false);
-        lc.setLed(2,6,x,false);
-        lc.setLed(3,6,x,false);
-      }
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B00000010); // 7seg ="-"
-      digitalWrite(latchPin, HIGH);
-      break;
-    case 0:           // SCHRITT 1 
-      
-      for (int x = 0; x<8; x++)
-      {
-        lc.setLed(0,7,x,false);
-        lc.setLed(1,7,x,false);
-        lc.setLed(2,7,x,false);
-        lc.setLed(3,7,x,false);
-        lc.setLed(0,6,x,false);
-        lc.setLed(1,6,x,false);
-        lc.setLed(2,6,x,false);
-        lc.setLed(3,6,x,false);
-      }
-      
-      lc.setLed(3,7,0,true);
-      lc.setLed(3,7,1,true);
-      lc.setLed(3,6,0,true);
-      lc.setLed(3,6,1,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B01100000); // 7seg ="1"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;    
-    case 1:           // SCHRITT 2 
-      
-      lc.setLed(3,7,2,true);
-      lc.setLed(3,7,3,true);
-      lc.setLed(3,7,0,false);
-      lc.setLed(3,7,1,false);
-      lc.setLed(3,6,2,true);
-      lc.setLed(3,6,3,true);
-      lc.setLed(3,6,0,false);
-      lc.setLed(3,6,1,false);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11011010); // 7seg ="2"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 2:           // SCHRITT 3
-      
-      lc.setLed(3,7,4,true);
-      lc.setLed(3,7,5,true);
-      lc.setLed(3,7,2,false);
-      lc.setLed(3,7,3,false);
-      lc.setLed(3,6,4,true);
-      lc.setLed(3,6,5,true);
-      lc.setLed(3,6,2,false);
-      lc.setLed(3,6,3,false);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11110010); // 7seg ="3"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 3:           // SCHRITT 4
- 
-      lc.setLed(3,7,6,true);
-      lc.setLed(3,7,7,true);
-      lc.setLed(3,7,4,false);
-      lc.setLed(3,7,5,false);
-      lc.setLed(3,6,6,true);
-      lc.setLed(3,6,7,true);
-      lc.setLed(3,6,4,false);
-      lc.setLed(3,6,5,false);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B01100110); // 7seg ="4"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 4:           // SCHRITT 5
-      
-      lc.setLed(2,7,0,true);
-      lc.setLed(2,7,1,true);
-      lc.setLed(3,7,6,false);
-      lc.setLed(3,7,7,false);
-      lc.setLed(2,6,0,true);
-      lc.setLed(2,6,1,true);
-      lc.setLed(3,6,6,false);
-      lc.setLed(3,6,7,false);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B10110110); // 7seg ="5"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 5:           // SCHRITT 6
-      
-      lc.setLed(2,7,0,false);
-      lc.setLed(2,7,1,false);
-      lc.setLed(2,7,2,true);
-      lc.setLed(2,7,3,true);
-      lc.setLed(2,6,0,false);
-      lc.setLed(2,6,1,false);
-      lc.setLed(2,6,2,true);
-      lc.setLed(2,6,3,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B10111110); // 7seg ="6"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 6:           // SCHRITT 7
-      
-      lc.setLed(2,7,2,false);
-      lc.setLed(2,7,3,false);
-      lc.setLed(2,7,4,true);
-      lc.setLed(2,7,5,true);
-      lc.setLed(2,6,2,false);
-      lc.setLed(2,6,3,false);
-      lc.setLed(2,6,4,true);
-      lc.setLed(2,6,5,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11100000); // 7seg ="7"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 7:           // SCHRITT 8
-      
-      lc.setLed(2,7,4,false);
-      lc.setLed(2,7,5,false);
-      lc.setLed(2,7,6,true);
-      lc.setLed(2,7,7,true);
-      lc.setLed(2,6,4,false);
-      lc.setLed(2,6,5,false);
-      lc.setLed(2,6,6,true);
-      lc.setLed(2,6,7,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11111110); // 7seg ="8"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 8:           // SCHRITT 9
-      
-      lc.setLed(2,7,6,false);
-      lc.setLed(2,7,7,false);
-      lc.setLed(1,7,0,true);
-      lc.setLed(1,7,1,true);
-      lc.setLed(2,6,6,false);
-      lc.setLed(2,6,7,false);
-      lc.setLed(1,6,0,true);
-      lc.setLed(1,6,1,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B01100000); // 7seg ="1"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;    
-    case 9:           // SCHRITT 10
-      
-      lc.setLed(1,7,0,false);
-      lc.setLed(1,7,1,false);
-      lc.setLed(1,7,2,true);
-      lc.setLed(1,7,3,true);
-      lc.setLed(1,6,0,false);
-      lc.setLed(1,6,1,false);
-      lc.setLed(1,6,2,true);
-      lc.setLed(1,6,3,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11011010); // 7seg ="2"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 10:           // SCHRITT 11
-      
-      lc.setLed(1,7,2,false);
-      lc.setLed(1,7,3,false);
-      lc.setLed(1,7,4,true);
-      lc.setLed(1,7,5,true);
-      lc.setLed(1,6,2,false);
-      lc.setLed(1,6,3,false);
-      lc.setLed(1,6,4,true);
-      lc.setLed(1,6,5,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11110010); // 7seg ="3"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 11:           // SCHRITT 12
-      
-      lc.setLed(1,7,4,false);
-      lc.setLed(1,7,5,false);
-      lc.setLed(1,7,6,true);
-      lc.setLed(1,7,7,true);
-      lc.setLed(1,6,4,false);
-      lc.setLed(1,6,5,false);
-      lc.setLed(1,6,6,true);
-      lc.setLed(1,6,7,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B01100110); // 7seg ="4"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 12:           // SCHRITT 13
-     
-      lc.setLed(1,7,6,false);
-      lc.setLed(1,7,7,false);
-      lc.setLed(0,7,0,true);
-      lc.setLed(0,7,1,true);
-      lc.setLed(1,6,6,false);
-      lc.setLed(1,6,7,false);
-      lc.setLed(0,6,0,true);
-      lc.setLed(0,6,1,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B10110110); // 7seg ="5"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 13:           // SCHRITT 14
-      
-      lc.setLed(0,7,0,false);
-      lc.setLed(0,7,1,false);
-      lc.setLed(0,7,2,true);
-      lc.setLed(0,7,3,true);
-      lc.setLed(0,6,0,false);
-      lc.setLed(0,6,1,false);
-      lc.setLed(0,6,2,true);
-      lc.setLed(0,6,3,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B10111110); // 7seg ="6"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 14:           // SCHRITT 15
-      
-      lc.setLed(0,7,2,false);
-      lc.setLed(0,7,3,false);
-      lc.setLed(0,7,4,true);
-      lc.setLed(0,7,5,true);
-      lc.setLed(0,6,2,false);
-      lc.setLed(0,6,3,false);
-      lc.setLed(0,6,4,true);
-      lc.setLed(0,6,5,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11100000); // 7seg ="7"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler++;
-      if (Taktzaehler == Patternlenght) {Taktzaehler = 0;}
-      break;
-    case 15:           // SCHRITT 16
-      
-      lc.setLed(0,7,4,false);
-      lc.setLed(0,7,5,false);
-      lc.setLed(0,7,6,true);
-      lc.setLed(0,7,7,true);
-      lc.setLed(0,6,4,false);
-      lc.setLed(0,6,5,false);
-      lc.setLed(0,6,6,true);
-      lc.setLed(0,6,7,true);
-      digitalWrite(latchPin, LOW);
-      shiftOut(dataPin, clockPin, LSBFIRST, B11111110); // 7seg ="8"
-      digitalWrite(latchPin, HIGH);
-      Taktzaehler = 0;
-      break;
+  switch (Schrittzähler)
+  { // Inkrementierung und Reset des Schrittzählers - Anzeigen des aktuellen Schrittzählers auf LED-Matrix
+
+  case -1: // STOP --- um Interrupt wieder zu starten, bei START-Druck Schrittzähler auf 0 setzen und Timer1.attachen
+    for (int x = 0; x < 8; x++)
+    {
+      lc.setLed(0, 7, x, false);
+      lc.setLed(1, 7, x, false);
+      lc.setLed(2, 7, x, false);
+      lc.setLed(3, 7, x, false);
+      lc.setLed(0, 6, x, false);
+      lc.setLed(1, 6, x, false);
+      lc.setLed(2, 6, x, false);
+      lc.setLed(3, 6, x, false);
+    }
+    break;
+
+  case 0:                       // SCHRITT 1
+    for (int x = 0; x < 8; x++) // Zuerst alle LEDs der Schrittzähler-Anzeige deaktivieren, weil letzter Schritt vor Schritt 1 abhängig von eingestellter Patternlänge ist
+    {
+      lc.setLed(0, 7, x, false);
+      lc.setLed(1, 7, x, false);
+      lc.setLed(2, 7, x, false);
+      lc.setLed(3, 7, x, false);
+      lc.setLed(0, 6, x, false);
+      lc.setLed(1, 6, x, false);
+      lc.setLed(2, 6, x, false);
+      lc.setLed(3, 6, x, false);
+    }
+    lc.setLed(3, 7, 0, true); // 4 LEDs zur Anzeige des Schrittzählers aktivieren
+    lc.setLed(3, 7, 1, true);
+    lc.setLed(3, 6, 0, true);
+    lc.setLed(3, 6, 1, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    } // Schrittzähler zurücksetzen wenn eingestellte Patternlänge erreicht wurde
+    break;
+
+  case 1:                     // SCHRITT 2
+    lc.setLed(3, 7, 2, true); // die vier LEDs aus Schritt 1 deaktivieren und entsprechend vier zur Anzeige von Schritt 2 aktivieren
+    lc.setLed(3, 7, 3, true);
+    lc.setLed(3, 7, 0, false);
+    lc.setLed(3, 7, 1, false);
+    lc.setLed(3, 6, 2, true);
+    lc.setLed(3, 6, 3, true);
+    lc.setLed(3, 6, 0, false);
+    lc.setLed(3, 6, 1, false);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 2: // SCHRITT 3
+    lc.setLed(3, 7, 4, true);
+    lc.setLed(3, 7, 5, true);
+    lc.setLed(3, 7, 2, false);
+    lc.setLed(3, 7, 3, false);
+    lc.setLed(3, 6, 4, true);
+    lc.setLed(3, 6, 5, true);
+    lc.setLed(3, 6, 2, false);
+    lc.setLed(3, 6, 3, false);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 3: // SCHRITT 4
+    lc.setLed(3, 7, 6, true);
+    lc.setLed(3, 7, 7, true);
+    lc.setLed(3, 7, 4, false);
+    lc.setLed(3, 7, 5, false);
+    lc.setLed(3, 6, 6, true);
+    lc.setLed(3, 6, 7, true);
+    lc.setLed(3, 6, 4, false);
+    lc.setLed(3, 6, 5, false);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 4: // SCHRITT 5
+    lc.setLed(2, 7, 0, true);
+    lc.setLed(2, 7, 1, true);
+    lc.setLed(3, 7, 6, false);
+    lc.setLed(3, 7, 7, false);
+    lc.setLed(2, 6, 0, true);
+    lc.setLed(2, 6, 1, true);
+    lc.setLed(3, 6, 6, false);
+    lc.setLed(3, 6, 7, false);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 5: // SCHRITT 6
+    lc.setLed(2, 7, 0, false);
+    lc.setLed(2, 7, 1, false);
+    lc.setLed(2, 7, 2, true);
+    lc.setLed(2, 7, 3, true);
+    lc.setLed(2, 6, 0, false);
+    lc.setLed(2, 6, 1, false);
+    lc.setLed(2, 6, 2, true);
+    lc.setLed(2, 6, 3, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 6: // SCHRITT 7
+    lc.setLed(2, 7, 2, false);
+    lc.setLed(2, 7, 3, false);
+    lc.setLed(2, 7, 4, true);
+    lc.setLed(2, 7, 5, true);
+    lc.setLed(2, 6, 2, false);
+    lc.setLed(2, 6, 3, false);
+    lc.setLed(2, 6, 4, true);
+    lc.setLed(2, 6, 5, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 7: // SCHRITT 8
+    lc.setLed(2, 7, 4, false);
+    lc.setLed(2, 7, 5, false);
+    lc.setLed(2, 7, 6, true);
+    lc.setLed(2, 7, 7, true);
+    lc.setLed(2, 6, 4, false);
+    lc.setLed(2, 6, 5, false);
+    lc.setLed(2, 6, 6, true);
+    lc.setLed(2, 6, 7, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 8: // SCHRITT 9
+    lc.setLed(2, 7, 6, false);
+    lc.setLed(2, 7, 7, false);
+    lc.setLed(1, 7, 0, true);
+    lc.setLed(1, 7, 1, true);
+    lc.setLed(2, 6, 6, false);
+    lc.setLed(2, 6, 7, false);
+    lc.setLed(1, 6, 0, true);
+    lc.setLed(1, 6, 1, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 9: // SCHRITT 10
+    lc.setLed(1, 7, 0, false);
+    lc.setLed(1, 7, 1, false);
+    lc.setLed(1, 7, 2, true);
+    lc.setLed(1, 7, 3, true);
+    lc.setLed(1, 6, 0, false);
+    lc.setLed(1, 6, 1, false);
+    lc.setLed(1, 6, 2, true);
+    lc.setLed(1, 6, 3, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 10: // SCHRITT 11
+    lc.setLed(1, 7, 2, false);
+    lc.setLed(1, 7, 3, false);
+    lc.setLed(1, 7, 4, true);
+    lc.setLed(1, 7, 5, true);
+    lc.setLed(1, 6, 2, false);
+    lc.setLed(1, 6, 3, false);
+    lc.setLed(1, 6, 4, true);
+    lc.setLed(1, 6, 5, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 11: // SCHRITT 12
+    lc.setLed(1, 7, 4, false);
+    lc.setLed(1, 7, 5, false);
+    lc.setLed(1, 7, 6, true);
+    lc.setLed(1, 7, 7, true);
+    lc.setLed(1, 6, 4, false);
+    lc.setLed(1, 6, 5, false);
+    lc.setLed(1, 6, 6, true);
+    lc.setLed(1, 6, 7, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 12: // SCHRITT 13
+    lc.setLed(1, 7, 6, false);
+    lc.setLed(1, 7, 7, false);
+    lc.setLed(0, 7, 0, true);
+    lc.setLed(0, 7, 1, true);
+    lc.setLed(1, 6, 6, false);
+    lc.setLed(1, 6, 7, false);
+    lc.setLed(0, 6, 0, true);
+    lc.setLed(0, 6, 1, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 13: // SCHRITT 14
+    lc.setLed(0, 7, 0, false);
+    lc.setLed(0, 7, 1, false);
+    lc.setLed(0, 7, 2, true);
+    lc.setLed(0, 7, 3, true);
+    lc.setLed(0, 6, 0, false);
+    lc.setLed(0, 6, 1, false);
+    lc.setLed(0, 6, 2, true);
+    lc.setLed(0, 6, 3, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 14: // SCHRITT 15
+    lc.setLed(0, 7, 2, false);
+    lc.setLed(0, 7, 3, false);
+    lc.setLed(0, 7, 4, true);
+    lc.setLed(0, 7, 5, true);
+    lc.setLed(0, 6, 2, false);
+    lc.setLed(0, 6, 3, false);
+    lc.setLed(0, 6, 4, true);
+    lc.setLed(0, 6, 5, true);
+    Schrittzähler++;
+    if (Schrittzähler == Patternlänge)
+    {
+      Schrittzähler = 0;
+    }
+    break;
+
+  case 15: // SCHRITT 16
+    lc.setLed(0, 7, 4, false);
+    lc.setLed(0, 7, 5, false);
+    lc.setLed(0, 7, 6, true);
+    lc.setLed(0, 7, 7, true);
+    lc.setLed(0, 6, 4, false);
+    lc.setLed(0, 6, 5, false);
+    lc.setLed(0, 6, 6, true);
+    lc.setLed(0, 6, 7, true);
+    Schrittzähler = 0;
+    break;
   }
-  }
+}
+
 void checkButtons()
 {
-reading = digitalRead(PlayStopButton);
-// compare the buttonState to its previous state
-  if (reading == HIGH && previous == LOW && millis() - time > debounce) {
-    if (state == HIGH){
-      state = LOW;
-      Taktzaehler = -1;
-    }
-    else{
-      state = HIGH;
-      if (Taktzaehler == -1)
-      {
-        Taktzaehler = 0;
-       }
-      else {
-        Taktzaehler=Taktzaehler;
-        }
-    }
-    time = millis();    
-  }
 
+  //ABFRAGE des Start/Stop-Tasters, Schaltersimulation
+  reading = digitalRead(PlayStopButton);
+
+  if (reading == HIGH && previous == LOW && millis() - time > debounce)
+  {
+    if (state == HIGH)
+    {
+      state = LOW;
+      Schrittzähler = -1;
+    }
+    else
+    {
+      state = HIGH;
+      if (Schrittzähler == -1)
+      {
+        Schrittzähler = 0;
+      }
+      else
+      {
+        Schrittzähler = Schrittzähler;
+      }
+    }
+    time = millis();
+  }
 
   previous = reading;
 
-  for (int hori = 0; hori < 8; hori ++){
-    for (int vert = 0; vert < 5; vert ++){
-      if ((digitalRead(buttonpinsvert[vert]) == HIGH && digitalRead(buttonpinshori[hori]) && millis() - time2 > debounce2) == HIGH ){
-        
-        if (vert == 0){ // KICK
-          if (currentpattern[0][hori] == 0){
+  // ABFRAGE der Taster zur Programmierung des Patterns
+
+  for (int hori = 0; hori < 8; hori++)
+  {
+    for (int vert = 0; vert < 5; vert++)
+    {
+      if ((digitalRead(buttonpinsvert[vert]) == HIGH && digitalRead(buttonpinshori[hori]) && millis() - time2 > debounce2) == HIGH)
+      {
+
+        if (vert == 0)
+        { // KICK
+          if (currentpattern[0][hori] == 0)
+          {
             currentpattern[0][hori] = 1;
           }
-          else {currentpattern[0][hori] =0;}
-          time2 = millis();  
+          else
+          {
+            currentpattern[0][hori] = 0;
+          }
+          time2 = millis();
         }
-        else{};
-        if (vert == 1){ // SNARE
-          if (currentpattern[1][hori] == 0){
+        else
+        {
+        };
+        if (vert == 1)
+        { // SNARE
+          if (currentpattern[1][hori] == 0)
+          {
             currentpattern[1][hori] = 1;
           }
-          else {currentpattern[1][hori] =0;}
-          time2 = millis();   
+          else
+          {
+            currentpattern[1][hori] = 0;
+          }
+          time2 = millis();
         }
-        if (vert == 2){ // HIGHHAT
-          if (currentpattern[2][hori] == 0){
+        else
+        {
+        };
+        if (vert == 2)
+        { // HIGHHAT
+          if (currentpattern[2][hori] == 0)
+          {
             currentpattern[2][hori] = 1;
           }
-          else {currentpattern[2][hori] =0;}
-          time2 = millis();   
+          else
+          {
+            currentpattern[2][hori] = 0;
+          }
+          time2 = millis();
         }
-        else{};
-        if (vert == 3){ // BONGOINNEN
-          if (currentpattern[3][hori] == 0){
+        else
+        {
+        };
+        if (vert == 3)
+        { // BONGOINNEN
+          if (currentpattern[3][hori] == 0)
+          {
             currentpattern[3][hori] = 1;
           }
-          else {currentpattern[3][hori] =0;}
-          time2 = millis();   
+          else
+          {
+            currentpattern[3][hori] = 0;
+          }
+          time2 = millis();
         }
-        else{};
-
+        else
+        {
+        };
+        if (vert == 4)
+        { // BONGOAUSSEN
+          if (currentpattern[4][hori] == 0)
+          {
+            currentpattern[4][hori] = 1;
+          }
+          else
+          {
+            currentpattern[4][hori] = 0;
+          }
+          time2 = millis();
+        }
+        else
+        {
+        };
       }
-      
-      else{};
-      
+
+      else
+      {
+      };
     }
-    
   }
- 
+  // ABFRAGE Taster zum Speichern und Abrufen von Patterns
+
+  if (digitalRead(savepin) == HIGH)
+  {
+    savePattern();
+  }
+  else
+  {
+  };
+
+  if (digitalRead(recallpin) == HIGH)
+  {
+    recallPattern();
+  }
+  else
+  {
+  };
 }
 void checkMatrix() // AUSLESEN DES ARRAYS "currentpattern" und entsprechende Ansteuerung der LED-Matrix
 {
- for (int i = 0; i < 4; i++) 
+  for (int i = 0; i < 4; i++) // 1. (linkes) Matrixelement (in setLed Nummerierung anders: Nr.3 )
   {
-   if (currentpattern[0][i] == true)
-    { 
-    lc.setLed(3,0,i*2,true);
-    lc.setLed(3,0,i*2+1,true);
-    }
-   else
+    if (currentpattern[0][i] == true)
     {
-    lc.setLed(3,0,i*2,false);
-    lc.setLed(3,0,i*2+1,false);
+      lc.setLed(3, 0, i * 2, true);
+      lc.setLed(3, 0, i * 2 + 1, true);
     }
-   if (currentpattern[1][i] == true)
-    { 
-    lc.setLed(3,1,i*2,true);
-    lc.setLed(3,1,i*2+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(3,1,i*2,false);
-    lc.setLed(3,1,i*2+1,false);
+      lc.setLed(3, 0, i * 2, false);
+      lc.setLed(3, 0, i * 2 + 1, false);
     }
-   if (currentpattern[2][i] == true)
-    { 
-    lc.setLed(3,2,2*i,true);
-    lc.setLed(3,2,2*i+1,true);
-    }
-   else
+    if (currentpattern[1][i] == true)
     {
-    lc.setLed(3,2,2*i,false);
-    lc.setLed(3,2,2*i+1,false);
+      lc.setLed(3, 1, i * 2, true);
+      lc.setLed(3, 1, i * 2 + 1, true);
     }
-   if (currentpattern[3][i] == true)
-    { 
-    lc.setLed(3,3,2*i,true);
-    lc.setLed(3,3,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(3,3,2*i,false);
-    lc.setLed(3,3,2*i+1,false);
+      lc.setLed(3, 1, i * 2, false);
+      lc.setLed(3, 1, i * 2 + 1, false);
     }
-   if (currentpattern[4][i] == true)
-    { 
-    lc.setLed(3,4,2*i,true);
-    lc.setLed(3,4,2*i+1,true);
-    }
-   else
+    if (currentpattern[2][i] == true)
     {
-    lc.setLed(3,4,2*i,false);
-    lc.setLed(3,4,2*i+1,false);
+      lc.setLed(3, 2, 2 * i, true);
+      lc.setLed(3, 2, 2 * i + 1, true);
     }
-   /*if (currentpattern[5][i] == true)
-    { 
-    lc.setLed(3,5,2*i,true);
-    lc.setLed(3,5,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(3,5,2*i,false);
-    lc.setLed(3,5,2*i+1,false);
-    }*/
+      lc.setLed(3, 2, 2 * i, false);
+      lc.setLed(3, 2, 2 * i + 1, false);
+    }
+    if (currentpattern[3][i] == true)
+    {
+      lc.setLed(3, 3, 2 * i, true);
+      lc.setLed(3, 3, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(3, 3, 2 * i, false);
+      lc.setLed(3, 3, 2 * i + 1, false);
+    }
+    if (currentpattern[4][i] == true)
+    {
+      lc.setLed(3, 4, 2 * i, true);
+      lc.setLed(3, 4, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(3, 4, 2 * i, false);
+      lc.setLed(3, 4, 2 * i + 1, false);
+    }
   }
-for (int i= 0; i < 4; i++)
+  for (int i = 0; i < 4; i++) // 2. (links-mittleres) Matrixelement (Nr. 2)
   {
-   if (currentpattern[0][i+4] == true)
-    { 
-    lc.setLed(2,0,i*2,true);
-    lc.setLed(2,0,i*2+1,true);
-    }
-   else
+    if (currentpattern[0][i + 4] == true)
     {
-    lc.setLed(2,0,i*2,false);
-    lc.setLed(2,0,i*2+1,false);
+      lc.setLed(2, 0, i * 2, true);
+      lc.setLed(2, 0, i * 2 + 1, true);
     }
-   if (currentpattern[1][i+4] == true)
-    { 
-    lc.setLed(2,1,i*2,true);
-    lc.setLed(2,1,i*2+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(2,1,i*2,false);
-    lc.setLed(2,1,i*2+1,false);
+      lc.setLed(2, 0, i * 2, false);
+      lc.setLed(2, 0, i * 2 + 1, false);
     }
-   if (currentpattern[2][i+4] == true)
-    { 
-    lc.setLed(2,2,2*i,true);
-    lc.setLed(2,2,2*i+1,true);
-    }
-   else
+    if (currentpattern[1][i + 4] == true)
     {
-    lc.setLed(2,2,2*i,false);
-    lc.setLed(2,2,2*i+1,false);
+      lc.setLed(2, 1, i * 2, true);
+      lc.setLed(2, 1, i * 2 + 1, true);
     }
-   if (currentpattern[3][i+4] == true)
-    { 
-    lc.setLed(2,3,2*i,true);
-    lc.setLed(2,3,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(2,3,2*i,false);
-    lc.setLed(2,3,2*i+1,false);
+      lc.setLed(2, 1, i * 2, false);
+      lc.setLed(2, 1, i * 2 + 1, false);
     }
-   if (currentpattern[4][i+4] == true)
-    { 
-    lc.setLed(2,4,2*i,true);
-    lc.setLed(2,4,2*i+1,true);
-    }
-   else
+    if (currentpattern[2][i + 4] == true)
     {
-    lc.setLed(2,4,2*i,false);
-    lc.setLed(2,4,2*i+1,false);
+      lc.setLed(2, 2, 2 * i, true);
+      lc.setLed(2, 2, 2 * i + 1, true);
     }
-  /* if (currentpattern[5][i+4] == true)
-    { 
-    lc.setLed(2,5,2*i,true);
-    lc.setLed(2,5,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(2,5,2*i,false);
-    lc.setLed(2,5,2*i+1,false);
-    }*/
-}
-for (int i= 0; i < 4; i++)
+      lc.setLed(2, 2, 2 * i, false);
+      lc.setLed(2, 2, 2 * i + 1, false);
+    }
+    if (currentpattern[3][i + 4] == true)
+    {
+      lc.setLed(2, 3, 2 * i, true);
+      lc.setLed(2, 3, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(2, 3, 2 * i, false);
+      lc.setLed(2, 3, 2 * i + 1, false);
+    }
+    if (currentpattern[4][i + 4] == true)
+    {
+      lc.setLed(2, 4, 2 * i, true);
+      lc.setLed(2, 4, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(2, 4, 2 * i, false);
+      lc.setLed(2, 4, 2 * i + 1, false);
+    }
+  }
+  for (int i = 0; i < 4; i++) // 3. (rechts-mittleres) Matrixelement (Nr. 1)
   {
-   if (currentpattern[0][i+8] == true)
-    { 
-    lc.setLed(1,0,i*2,true);
-    lc.setLed(1,0,i*2+1,true);
-    }
-   else
+    if (currentpattern[0][i + 8] == true)
     {
-    lc.setLed(1,0,i*2,false);
-    lc.setLed(1,0,i*2+1,false);
+      lc.setLed(1, 0, i * 2, true);
+      lc.setLed(1, 0, i * 2 + 1, true);
     }
-   if (currentpattern[1][i+8] == true)
-    { 
-    lc.setLed(1,1,i*2,true);
-    lc.setLed(1,1,i*2+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(1,1,i*2,false);
-    lc.setLed(1,1,i*2+1,false);
+      lc.setLed(1, 0, i * 2, false);
+      lc.setLed(1, 0, i * 2 + 1, false);
     }
-   if (currentpattern[2][i+8] == true)
-    { 
-    lc.setLed(1,2,2*i,true);
-    lc.setLed(1,2,2*i+1,true);
-    }
-   else
+    if (currentpattern[1][i + 8] == true)
     {
-    lc.setLed(1,2,2*i,false);
-    lc.setLed(1,2,2*i+1,false);
+      lc.setLed(1, 1, i * 2, true);
+      lc.setLed(1, 1, i * 2 + 1, true);
     }
-   if (currentpattern[3][i+8] == true)
-    { 
-    lc.setLed(1,3,2*i,true);
-    lc.setLed(1,3,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(1,3,2*i,false);
-    lc.setLed(1,3,2*i+1,false);
+      lc.setLed(1, 1, i * 2, false);
+      lc.setLed(1, 1, i * 2 + 1, false);
     }
-   if (currentpattern[4][i+8] == true)
-    { 
-    lc.setLed(1,4,2*i,true);
-    lc.setLed(1,4,2*i+1,true);
-    }
-   else
+    if (currentpattern[2][i + 8] == true)
     {
-    lc.setLed(1,4,2*i,false);
-    lc.setLed(1,4,2*i+1,false);
+      lc.setLed(1, 2, 2 * i, true);
+      lc.setLed(1, 2, 2 * i + 1, true);
     }
-   /*if (currentpattern[5][i+8] == true)
-    { 
-    lc.setLed(1,5,2*i,true);
-    lc.setLed(1,5,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(1,5,2*i,false);
-    lc.setLed(1,5,2*i+1,false);
-    }*/
-}
-for (int i= 0; i < 4; i++)
+      lc.setLed(1, 2, 2 * i, false);
+      lc.setLed(1, 2, 2 * i + 1, false);
+    }
+    if (currentpattern[3][i + 8] == true)
+    {
+      lc.setLed(1, 3, 2 * i, true);
+      lc.setLed(1, 3, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(1, 3, 2 * i, false);
+      lc.setLed(1, 3, 2 * i + 1, false);
+    }
+    if (currentpattern[4][i + 8] == true)
+    {
+      lc.setLed(1, 4, 2 * i, true);
+      lc.setLed(1, 4, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(1, 4, 2 * i, false);
+      lc.setLed(1, 4, 2 * i + 1, false);
+    }
+  }
+  for (int i = 0; i < 4; i++) // 4. (rechtes) Matrixelement (Nr. 0)
   {
-   if (currentpattern[0][i+12] == true)
-    { 
-    lc.setLed(0,0,i*2,true);
-    lc.setLed(0,0,i*2+1,true);
-    }
-   else
+    if (currentpattern[0][i + 12] == true)
     {
-    lc.setLed(0,0,i*2,false);
-    lc.setLed(0,0,i*2+1,false);
+      lc.setLed(0, 0, i * 2, true);
+      lc.setLed(0, 0, i * 2 + 1, true);
     }
-   if (currentpattern[1][i+12] == true)
-    { 
-    lc.setLed(0,1,i*2,true);
-    lc.setLed(0,1,i*2+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(0,1,i*2,false);
-    lc.setLed(0,1,i*2+1,false);
+      lc.setLed(0, 0, i * 2, false);
+      lc.setLed(0, 0, i * 2 + 1, false);
     }
-   if (currentpattern[2][i+12] == true)
-    { 
-    lc.setLed(0,2,2*i,true);
-    lc.setLed(0,2,2*i+1,true);
-    }
-   else
+    if (currentpattern[1][i + 12] == true)
     {
-    lc.setLed(0,2,2*i,false);
-    lc.setLed(0,2,2*i+1,false);
+      lc.setLed(0, 1, i * 2, true);
+      lc.setLed(0, 1, i * 2 + 1, true);
     }
-   if (currentpattern[3][i+12] == true)
-    { 
-    lc.setLed(0,3,2*i,true);
-    lc.setLed(0,3,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(0,3,2*i,false);
-    lc.setLed(0,3,2*i+1,false);
+      lc.setLed(0, 1, i * 2, false);
+      lc.setLed(0, 1, i * 2 + 1, false);
     }
-   if (currentpattern[4][i+12] == true)
-    { 
-    lc.setLed(0,4,2*i,true);
-    lc.setLed(0,4,2*i+1,true);
-    }
-   else
+    if (currentpattern[2][i + 12] == true)
     {
-    lc.setLed(0,4,2*i,false);
-    lc.setLed(0,4,2*i+1,false);
+      lc.setLed(0, 2, 2 * i, true);
+      lc.setLed(0, 2, 2 * i + 1, true);
     }
-/*   if (currentpattern[5][i+12] == true)
-    { 
-    lc.setLed(0,5,2*i,true);
-    lc.setLed(0,5,2*i+1,true);
-    }
-   else
+    else
     {
-    lc.setLed(0,5,2*i,false);
-    lc.setLed(0,5,2*i+1,false);
+      lc.setLed(0, 2, 2 * i, false);
+      lc.setLed(0, 2, 2 * i + 1, false);
     }
-*/
-}
+    if (currentpattern[3][i + 12] == true)
+    {
+      lc.setLed(0, 3, 2 * i, true);
+      lc.setLed(0, 3, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(0, 3, 2 * i, false);
+      lc.setLed(0, 3, 2 * i + 1, false);
+    }
+    if (currentpattern[4][i + 12] == true)
+    {
+      lc.setLed(0, 4, 2 * i, true);
+      lc.setLed(0, 4, 2 * i + 1, true);
+    }
+    else
+    {
+      lc.setLed(0, 4, 2 * i, false);
+      lc.setLed(0, 4, 2 * i + 1, false);
+    }
+  }
 }
 
-void noteOn(int cmd, int pitch, int velocity) { // MIDI
+void noteOn(int cmd, int pitch, int velocity)
+{ // MIDI
   Serial1.write(cmd);
   Serial1.write(pitch);
   Serial1.write(velocity);
